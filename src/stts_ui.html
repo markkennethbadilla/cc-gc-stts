@@ -1604,24 +1604,32 @@
   </script>
   <!-- fork additions (markkennethbadilla/cc-gc-stts): voice picker + optional auto-send on pause.
        Kept as one separate script block that only reads the upstream page's top-level bindings,
-       so upstream changes merge without touching this and this can be deleted if upstream ships the same. -->
+       so upstream changes merge without touching this and this can be deleted if upstream ships the same.
+       The controls reuse the page's own history-bar classes so they match the theme. -->
   <script>
     (function () {
       const LS_VOICE = '__stts__voice';
       const LS_AUTOSEND = '__stts__autosend';
       const LS_AUTOSEND_MS = '__stts__autosend_ms';
 
+      function addBar(container, label, innerHtml) {
+        const bar = document.createElement('div');
+        bar.className = 'history-bar';
+        bar.innerHTML = `<span class="history-label">${label}</span>${innerHtml}`;
+        const history = container.querySelector('.history-bar');
+        history.parentNode.insertBefore(bar, history.nextSibling);
+        return bar;
+      }
+
       /* ---- voice picker ---- */
-      const voiceSelect = document.createElement('select');
-      voiceSelect.id = 'voice-select';
-      voiceSelect.title = 'Voice used to read responses';
-      voiceSelect.style.cssText = 'max-width:14em;font-size:12px;';
-      refreshBtn.parentNode.insertBefore(voiceSelect, refreshBtn);
+      const voiceBar = addBar(ttsContainer, 'Voice',
+        '<select class="history-select" id="voice-select" title="Voice used to read responses"></select>');
+      const voiceSelect = voiceBar.querySelector('#voice-select');
 
       function fillVoices() {
         const voices = synth.getVoices();
         const saved = localStorage.getItem(LS_VOICE) || '';
-        voiceSelect.innerHTML = '<option value="">Default voice</option>' +
+        voiceSelect.innerHTML = '<option value="">Default (first en-US voice)</option>' +
           voices.map(v => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`).join('');
       }
       fillVoices();
@@ -1637,13 +1645,12 @@
       };
 
       /* ---- auto-send after a pause (off by default) ---- */
-      const wrap = document.createElement('label');
-      wrap.title = 'Send the prompt automatically after this many seconds of silence';
-      wrap.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;';
-      wrap.innerHTML = '<input type="checkbox" id="autosend-on"> Auto-send after <input type="number" id="autosend-sec" min="0.5" step="0.5" style="width:3.5em"> s';
-      sendBtn.parentNode.insertBefore(wrap, sendBtn);
-      const autoOn = wrap.querySelector('#autosend-on');
-      const autoSec = wrap.querySelector('#autosend-sec');
+      const autoBar = addBar(sttContainer, 'Auto-send',
+        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-color);cursor:pointer">' +
+        '<input type="checkbox" id="autosend-on" style="margin:0"> after ' +
+        '<input type="number" class="history-select" id="autosend-sec" min="0.5" step="0.5" style="flex:0 0 4.5em;cursor:text"> s of silence</label>');
+      const autoOn = autoBar.querySelector('#autosend-on');
+      const autoSec = autoBar.querySelector('#autosend-sec');
       autoOn.checked = localStorage.getItem(LS_AUTOSEND) === '1';
       autoSec.value = (Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000) / 1000;
       autoOn.onchange = () => localStorage.setItem(LS_AUTOSEND, autoOn.checked ? '1' : '0');
