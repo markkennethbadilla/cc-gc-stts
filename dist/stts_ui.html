@@ -1,580 +1,636 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>STTS</title>
-    <style>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="shortcut icon" href="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+    type="image/x-icon">
+  <title>STTS</title>
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #202124;
+      --accent-color: #1a73e8;
+      --border-color: #dadce0;
+      --hover-color: #f1f3f4;
+      --danger-color: #d93025;
+      --shadow:
+        0 1px 2px 0 rgba(60, 64, 67, 0.3),
+        0 1px 3px 1px rgba(60, 64, 67, 0.15);
+      --font-stack:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+        Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+        "Segoe UI Symbol";
+    }
+
+    @media (prefers-color-scheme: dark) {
       :root {
-        --bg-color: #ffffff;
-        --text-color: #202124;
-        --accent-color: #1a73e8;
-        --border-color: #dadce0;
-        --hover-color: #f1f3f4;
-        --danger-color: #d93025;
-        --shadow:
-          0 1px 2px 0 rgba(60, 64, 67, 0.3),
-          0 1px 3px 1px rgba(60, 64, 67, 0.15);
-        --font-stack:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-          Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-          "Segoe UI Symbol";
+        --bg-color: #202124;
+        --text-color: #e8eaed;
+        --accent-color: #8ab4f8;
+        --border-color: #3c4043;
+        --hover-color: #303134;
+        --shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
       }
+    }
 
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg-color: #202124;
-          --text-color: #e8eaed;
-          --accent-color: #8ab4f8;
-          --border-color: #3c4043;
-          --hover-color: #303134;
-          --shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
-        }
-      }
+    * {
+      box-sizing: border-box;
+      font-family: var(--font-stack);
+    }
 
-      * {
-        box-sizing: border-box;
-        font-family: var(--font-stack);
-      }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
 
-      body {
-        background-color: var(--bg-color);
-        color: var(--text-color);
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        overflow: hidden;
-        -webkit-font-smoothing: antialiased;
-      }
+    .panels-row {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
 
-      .panels-row {
-        display: flex;
-        flex: 1;
-        overflow: hidden;
-      }
+    /* -- Split layout -- */
+    .panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 14px;
+    }
 
-      /* -- Split layout -- */
-      .panel {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        padding: 14px;
-      }
+    #stt-panel {
+      flex: 1;
+      min-width: 200px;
+    }
 
-      #stt-panel { flex: 1; min-width: 200px; }
-      #tts-panel { flex: 1; min-width: 200px; }
+    #tts-panel {
+      flex: 1;
+      min-width: 200px;
+    }
 
-      .splitter {
-        width: 6px;
-        background: var(--border-color);
-        cursor: col-resize;
-        flex-shrink: 0;
-        transition: background 0.15s;
-      }
+    .splitter {
+      width: 6px;
+      background: var(--border-color);
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
 
-      .splitter:hover,
-      .splitter.dragging {
-        background: var(--accent-color);
-      }
+    .splitter:hover,
+    .splitter.dragging {
+      background: var(--accent-color);
+    }
 
-      .panel-label {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #80868b;
-        margin-bottom: 8px;
-      }
+    .panel-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #80868b;
+      margin-bottom: 8px;
+    }
 
-      .panel-label.active {
-        color: var(--accent-color);
-      }
+    .panel-label.active {
+      color: var(--accent-color);
+    }
 
-      .panel.active-mode > .container {
-        border-color: var(--accent-color);
+    .panel.active-mode>.container {
+      border-color: var(--accent-color);
+      box-shadow:
+        0 0 0 2px var(--accent-color),
+        var(--shadow);
+    }
+
+    .panel.inactive>.container {
+      opacity: 0.4;
+      filter: grayscale(0.6);
+      pointer-events: none;
+    }
+
+    .panel.inactive>.panel-label {
+      opacity: 0.4;
+    }
+
+    /* -- End conversation -- */
+    .end-bar {
+      padding: 10px 14px;
+      display: flex;
+      justify-content: center;
+      border-top: 1px solid var(--border-color);
+      background: var(--hover-color);
+      flex-shrink: 0;
+    }
+
+    #end-btn {
+      background: var(--danger-color);
+      color: #fff;
+      padding: 0 32px;
+      height: 40px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    #end-btn:hover {
+      filter: brightness(1.15);
+    }
+
+    /* -- Shared container -- */
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      background: var(--bg-color);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+      transition:
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+    }
+
+    .container.listening,
+    .container.speaking {
+      animation: techno-pulse 6s infinite alternate;
+    }
+
+    @keyframes techno-pulse {
+      0% {
         box-shadow:
-          0 0 0 2px var(--accent-color),
-          var(--shadow);
-      }
-
-      .panel.inactive > .container {
-        opacity: 0.4;
-        filter: grayscale(0.6);
-        pointer-events: none;
-      }
-
-      .panel.inactive > .panel-label {
-        opacity: 0.4;
-      }
-
-      /* -- End conversation -- */
-      .end-bar {
-        padding: 10px 14px;
-        display: flex;
-        justify-content: center;
-        border-top: 1px solid var(--border-color);
-        background: var(--hover-color);
-        flex-shrink: 0;
-      }
-
-      #end-btn {
-        background: var(--danger-color);
-        color: #fff;
-        padding: 0 32px;
-        height: 40px;
-        font-size: 15px;
-        font-weight: 600;
-        border-radius: 8px;
-      }
-
-      #end-btn:hover {
-        filter: brightness(1.15);
-      }
-
-      /* -- Shared container -- */
-      .container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        background: var(--bg-color);
-        box-shadow: var(--shadow);
-        overflow: hidden;
-        position: relative;
-        transition:
-          border-color 0.3s ease,
-          box-shadow 0.3s ease;
-      }
-
-      .container.listening,
-      .container.speaking {
-        animation: techno-pulse 6s infinite alternate;
-      }
-
-      @keyframes techno-pulse {
-        0% {
-          box-shadow:
-            0 0 20px rgba(26, 115, 232, 0.6),
-            0 0 40px rgba(26, 115, 232, 0.3);
-          border-color: var(--accent-color);
-        }
-        33% {
-          box-shadow:
-            0 0 30px rgba(161, 66, 244, 0.7),
-            0 0 50px rgba(161, 66, 244, 0.4);
-          border-color: #a142f4;
-        }
-        66% {
-          box-shadow:
-            0 0 20px rgba(52, 168, 83, 0.6),
-            0 0 40px rgba(52, 168, 83, 0.3);
-          border-color: #34a853;
-        }
-        100% {
-          box-shadow:
-            0 0 35px rgba(241, 158, 56, 0.7),
-            0 0 60px rgba(241, 158, 56, 0.4);
-          border-color: #f19e38;
-        }
-      }
-
-      textarea {
-        flex: 1;
-        width: 100%;
-        border: none;
-        padding: 16px;
-        background: transparent;
-        color: var(--text-color);
-        font-size: 15px;
-        line-height: 1.5;
-        resize: none;
-        outline: none;
-      }
-
-      textarea::placeholder { color: #80868b; }
-
-      .bottom-bar {
-        display: flex;
-        align-items: center;
-        padding: 10px 14px;
-        border-top: 1px solid var(--border-color);
-        background: var(--hover-color);
-        gap: 12px;
-      }
-
-      .status-area {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex: 1;
-      }
-
-      button {
-        border: 1px solid transparent;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        transition: all 0.15s ease-in-out;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        height: 36px;
-      }
-
-      .actions { display: flex; gap: 10px; }
-
-      /* -- STT-specific -- */
-      #dictate-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        padding: 0;
-        justify-content: center;
-        flex-shrink: 0;
-        background: var(--bg-color);
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
-      }
-
-      #dictate-btn:hover {
-        background: var(--hover-color);
+          0 0 20px rgba(26, 115, 232, 0.6),
+          0 0 40px rgba(26, 115, 232, 0.3);
         border-color: var(--accent-color);
       }
 
-      #dictate-btn.recording {
-        background: var(--danger-color);
-        color: white;
-        border-color: var(--danger-color);
-        animation: pulse 1.5s infinite;
+      33% {
+        box-shadow:
+          0 0 30px rgba(161, 66, 244, 0.7),
+          0 0 50px rgba(161, 66, 244, 0.4);
+        border-color: #a142f4;
       }
 
-      @keyframes pulse {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4); }
-        70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(217, 48, 37, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); }
+      66% {
+        box-shadow:
+          0 0 20px rgba(52, 168, 83, 0.6),
+          0 0 40px rgba(52, 168, 83, 0.3);
+        border-color: #34a853;
       }
 
-      .stt-status {
-        font-size: 12.5px;
-        color: var(--accent-color);
-        font-weight: 500;
-        opacity: 0;
-        transition: opacity 0.2s;
+      100% {
+        box-shadow:
+          0 0 35px rgba(241, 158, 56, 0.7),
+          0 0 60px rgba(241, 158, 56, 0.4);
+        border-color: #f19e38;
+      }
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      border: none;
+      padding: 16px;
+      background: transparent;
+      color: var(--text-color);
+      font-size: 15px;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+    }
+
+    textarea::placeholder {
+      color: #80868b;
+    }
+
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border-color);
+      background: var(--hover-color);
+      gap: 12px;
+    }
+
+    .status-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.15s ease-in-out;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* -- STT-specific -- */
+    #dictate-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      padding: 0;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+    }
+
+    #dictate-btn:hover {
+      background: var(--hover-color);
+      border-color: var(--accent-color);
+    }
+
+    #dictate-btn.recording {
+      background: var(--danger-color);
+      color: white;
+      border-color: var(--danger-color);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4);
       }
 
-      .stt-status.visible { opacity: 1; }
-
-      #cancel-btn {
-        background: transparent;
-        color: var(--text-color);
-        padding: 0 16px;
+      70% {
+        transform: scale(1.08);
+        box-shadow: 0 0 0 10px rgba(217, 48, 37, 0);
       }
 
-      #cancel-btn:hover { background: var(--border-color); }
-
-      #send-btn {
-        background: var(--accent-color);
-        color: #ffffff;
-        padding: 0 20px;
+      100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(217, 48, 37, 0);
       }
+    }
 
-      #send-btn:hover {
-        filter: brightness(1.1);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      }
+    .stt-status {
+      font-size: 12.5px;
+      color: var(--accent-color);
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
 
-      .hint {
-        position: absolute;
-        bottom: 64px;
-        right: 16px;
-        font-size: 10.5px;
-        color: #80868b;
-        pointer-events: none;
-        background: var(--bg-color);
-        padding: 2px 6px;
-        border-radius: 4px;
-      }
+    .stt-status.visible {
+      opacity: 1;
+    }
 
-      #commands-btn, #tts-commands-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        padding: 0;
-        justify-content: center;
-        flex-shrink: 0;
-        background: var(--bg-color);
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
-        font-size: 16px;
-        line-height: 1;
-      }
+    #cancel-btn {
+      background: transparent;
+      color: var(--text-color);
+      padding: 0 16px;
+    }
 
-      #commands-btn:hover, #tts-commands-btn:hover {
-        background: var(--hover-color);
-        border-color: var(--accent-color);
-      }
+    #cancel-btn:hover {
+      background: var(--border-color);
+    }
 
-      #tts-dictate-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        padding: 0;
-        justify-content: center;
-        flex-shrink: 0;
-        background: var(--bg-color);
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
-      }
+    #send-btn {
+      background: var(--accent-color);
+      color: #ffffff;
+      padding: 0 20px;
+    }
 
-      #tts-dictate-btn:hover {
-        background: var(--hover-color);
-        border-color: var(--accent-color);
-      }
+    #send-btn:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
 
-      #tts-dictate-btn.recording {
-        background: var(--danger-color);
-        color: white;
-        border-color: var(--danger-color);
-        animation: pulse 1.5s infinite;
-      }
+    .hint {
+      position: absolute;
+      bottom: 64px;
+      right: 16px;
+      font-size: 10.5px;
+      color: #80868b;
+      pointer-events: none;
+      background: var(--bg-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
 
+    #commands-btn,
+    #tts-commands-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      padding: 0;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    #commands-btn:hover,
+    #tts-commands-btn:hover {
+      background: var(--hover-color);
+      border-color: var(--accent-color);
+    }
+
+    #tts-dictate-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      padding: 0;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+    }
+
+    #tts-dictate-btn:hover {
+      background: var(--hover-color);
+      border-color: var(--accent-color);
+    }
+
+    #tts-dictate-btn.recording {
+      background: var(--danger-color);
+      color: white;
+      border-color: var(--danger-color);
+      animation: pulse 1.5s infinite;
+    }
+
+    .commands-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 480px;
+      background: var(--bg-color);
+      border-left: 1px solid var(--border-color);
+      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+      z-index: 10;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+
+    .commands-panel.open {
+      transform: translateX(0);
+    }
+
+    .commands-panel h3 {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #80868b;
+      margin: 0 0 10px 0;
+    }
+
+    .commands-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 20px;
+    }
+
+    .commands-panel h4 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-color);
+      margin: 8px 0 4px 0;
+    }
+
+    .commands-panel h4:first-child {
+      margin-top: 0;
+    }
+
+    .commands-panel dl {
+      margin: 0;
+      font-size: 11.5px;
+      line-height: 1.5;
+    }
+
+    .commands-panel dt {
+      font-weight: 500;
+      color: var(--text-color);
+    }
+
+    .commands-panel dd {
+      margin: 0 0 4px 0;
+      color: #80868b;
+      font-size: 10.5px;
+    }
+
+    .commands-panel .close-panel {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      color: #80868b;
+      font-size: 18px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .commands-panel .close-panel:hover {
+      background: var(--hover-color);
+      color: var(--text-color);
+    }
+
+    @media (prefers-color-scheme: dark) {
       .commands-panel {
-        position: absolute;
-        top: 0; right: 0; bottom: 0;
-        width: 480px;
-        background: var(--bg-color);
-        border-left: 1px solid var(--border-color);
-        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-        transform: translateX(100%);
-        transition: transform 0.25s ease;
-        z-index: 10;
-        overflow-y: auto;
-        padding: 14px 16px;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.4);
       }
+    }
 
-      .commands-panel.open { transform: translateX(0); }
+    /* -- TTS-specific -- */
+    .visualizer {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      height: 24px;
+    }
 
-      .commands-panel h3 {
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #80868b;
-        margin: 0 0 10px 0;
-      }
+    .bar {
+      width: 3px;
+      height: 6px;
+      background: var(--accent-color);
+      border-radius: 1px;
+      transition: height 0.1s ease;
+    }
 
-      .commands-columns {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0 20px;
-      }
+    .bar.animating {
+      animation: bounce 0.6s infinite alternate;
+    }
 
-      .commands-panel h4 {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--accent-color);
-        margin: 8px 0 4px 0;
-      }
-
-      .commands-panel h4:first-child { margin-top: 0; }
-
-      .commands-panel dl {
-        margin: 0;
-        font-size: 11.5px;
-        line-height: 1.5;
-      }
-
-      .commands-panel dt { font-weight: 500; color: var(--text-color); }
-
-      .commands-panel dd {
-        margin: 0 0 4px 0;
-        color: #80868b;
-        font-size: 10.5px;
-      }
-
-      .commands-panel .close-panel {
-        position: absolute;
-        top: 8px; right: 8px;
-        background: none;
-        border: none;
-        color: #80868b;
-        font-size: 18px;
-        width: 24px; height: 24px;
-        padding: 0;
-        justify-content: center;
-        cursor: pointer;
-        border-radius: 4px;
-      }
-
-      .commands-panel .close-panel:hover {
-        background: var(--hover-color);
-        color: var(--text-color);
-      }
-
-      @media (prefers-color-scheme: dark) {
-        .commands-panel { box-shadow: -2px 0 8px rgba(0, 0, 0, 0.4); }
-      }
-
-      /* -- TTS-specific -- */
-      .visualizer {
-        display: flex;
-        align-items: center;
-        gap: 3px;
-        height: 24px;
-      }
-
-      .bar {
-        width: 3px;
+    @keyframes bounce {
+      from {
         height: 6px;
-        background: var(--accent-color);
-        border-radius: 1px;
-        transition: height 0.1s ease;
+        opacity: 0.4;
       }
 
-      .bar.animating {
-        animation: bounce 0.6s infinite alternate;
+      to {
+        height: 20px;
+        opacity: 1;
       }
+    }
 
-      @keyframes bounce {
-        from { height: 6px; opacity: 0.4; }
-        to { height: 20px; opacity: 1; }
-      }
+    .tts-status {
+      font-size: 13px;
+      color: var(--accent-color);
+      font-weight: 500;
+    }
 
-      .tts-status {
-        font-size: 13px;
-        color: var(--accent-color);
-        font-weight: 500;
-      }
+    #play-btn {
+      background: var(--accent-color);
+      color: #fff;
+      padding: 0 18px;
+    }
 
-      #play-btn {
-        background: var(--accent-color);
-        color: #fff;
-        padding: 0 18px;
-      }
+    #play-btn:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: scale(1.02);
+    }
 
-      #play-btn:hover:not(:disabled) {
-        filter: brightness(1.1);
-        transform: scale(1.02);
-      }
+    #play-btn:disabled,
+    #stop-btn:disabled {
+      background: var(--border-color);
+      color: #80868b;
+      cursor: not-allowed;
+    }
 
-      #play-btn:disabled, #stop-btn:disabled {
-        background: var(--border-color);
-        color: #80868b;
-        cursor: not-allowed;
-      }
+    #stop-btn {
+      background: var(--danger-color);
+      color: #fff;
+      padding: 0 18px;
+    }
 
-      #stop-btn {
-        background: var(--danger-color);
-        color: #fff;
-        padding: 0 18px;
-      }
+    #stop-btn:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: scale(1.02);
+    }
 
-      #stop-btn:hover:not(:disabled) {
-        filter: brightness(1.1);
-        transform: scale(1.02);
-      }
+    #refresh-btn {
+      background: var(--danger-color);
+      color: white;
+      padding: 0 18px;
+      display: none;
+    }
 
-      #refresh-btn {
-        background: var(--danger-color);
-        color: white;
-        padding: 0 18px;
-        display: none;
-      }
+    #gotit-btn {
+      background: var(--accent-color);
+      color: #fff;
+      padding: 0 20px;
+    }
 
-      #gotit-btn {
-        background: var(--accent-color);
-        color: #fff;
-        padding: 0 20px;
-      }
+    #gotit-btn:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
 
-      #gotit-btn:hover:not(:disabled) {
-        filter: brightness(1.1);
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      }
+    #gotit-btn:disabled {
+      background: var(--border-color);
+      color: #80868b;
+      cursor: not-allowed;
+    }
 
-      #gotit-btn:disabled {
-        background: var(--border-color);
-        color: #80868b;
-        cursor: not-allowed;
-      }
+    /* -- History -- */
+    .history-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--hover-color);
+      flex-shrink: 0;
+    }
 
-      /* -- History -- */
-      .history-bar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        border-bottom: 1px solid var(--border-color);
-        background: var(--hover-color);
-        flex-shrink: 0;
-      }
+    .history-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #80868b;
+      flex-shrink: 0;
+    }
 
-      .history-label {
-        font-size: 10.5px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #80868b;
-        flex-shrink: 0;
-      }
+    .history-select {
+      flex: 1;
+      min-width: 0;
+      font-size: 12px;
+      padding: 4px 6px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-color);
+      color: var(--text-color);
+      font-family: var(--font-stack);
+      cursor: pointer;
+    }
 
-      .history-select {
-        flex: 1;
-        min-width: 0;
-        font-size: 12px;
-        padding: 4px 6px;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
-        background: var(--bg-color);
-        color: var(--text-color);
-        font-family: var(--font-stack);
-        cursor: pointer;
-      }
+    .history-clear {
+      background: transparent;
+      color: #80868b;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 11px;
+      padding: 0 8px;
+      height: 24px;
+      flex-shrink: 0;
+    }
 
-      .history-clear {
-        background: transparent;
-        color: #80868b;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
-        font-size: 11px;
-        padding: 0 8px;
-        height: 24px;
-        flex-shrink: 0;
-      }
+    .history-clear:hover {
+      background: var(--bg-color);
+      color: var(--danger-color);
+      border-color: var(--danger-color);
+    }
 
-      .history-clear:hover {
-        background: var(--bg-color);
-        color: var(--danger-color);
-        border-color: var(--danger-color);
-      }
+    .panel.inactive>.container .history-bar {
+      pointer-events: auto;
+    }
+  </style>
+</head>
 
-      .panel.inactive > .container .history-bar {
-        pointer-events: auto;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="panels-row">
+<body>
+  <div class="panels-row">
     <!-- -- STT Panel (left) -- -->
     <div class="panel" id="stt-panel">
       <div class="panel-label" id="stt-label">Talk</div>
       <div class="container" id="stt-container">
         <div class="history-bar">
           <span class="history-label">History</span>
-          <select class="history-select" id="prompt-history" title="Load a past prompt (Alt+Up / Alt+Down also works)"></select>
-          <button class="history-clear" id="prompt-history-clear" title="Clear prompt history" tabindex="-1">Clear</button>
+          <select class="history-select" id="prompt-history"
+            title="Load a past prompt (Alt+Up / Alt+Down also works)"></select>
+          <button class="history-clear" id="prompt-history-clear" title="Clear prompt history"
+            tabindex="-1">Clear</button>
         </div>
-        <textarea
-          id="prompt-input"
-          placeholder="Enter your prompt..."
-          autofocus
-        ></textarea>
+        <textarea id="prompt-input" placeholder="Enter your prompt..." autofocus></textarea>
         <div class="hint">
-          <b>Ctrl+R</b> toggle STT &nbsp;&middot;&nbsp; <b>Enter</b> send &nbsp;&middot;&nbsp; <b>Shift+Enter</b> new line
+          <b>Ctrl+R</b> toggle STT &nbsp;&middot;&nbsp; <b>Enter</b> send &nbsp;&middot;&nbsp; <b>Shift+Enter</b> new
+          line
         </div>
         <div class="commands-panel" id="commands-panel">
           <button class="close-panel" id="close-panel" title="Close">&times;</button>
@@ -583,39 +639,55 @@
             <div>
               <h4>Punctuation</h4>
               <dl>
-                <dt>insert comma</dt><dd>Inserts <b>,</b></dd>
-                <dt>insert period</dt><dd>Inserts <b>.</b></dd>
-                <dt>insert question mark</dt><dd>Inserts <b>?</b></dd>
-                <dt>insert exclamation mark</dt><dd>Inserts <b>!</b></dd>
-                <dt>insert tab</dt><dd>Inserts a tab character</dd>
+                <dt>insert comma</dt>
+                <dd>Inserts <b>,</b></dd>
+                <dt>insert period</dt>
+                <dd>Inserts <b>.</b></dd>
+                <dt>insert question mark</dt>
+                <dd>Inserts <b>?</b></dd>
+                <dt>insert exclamation mark</dt>
+                <dd>Inserts <b>!</b></dd>
+                <dt>insert tab</dt>
+                <dd>Inserts a tab character</dd>
               </dl>
               <h4>Formatting</h4>
               <dl>
-                <dt>new paragraph</dt><dd>Ends sentence, starts new paragraph</dd>
+                <dt>new paragraph</dt>
+                <dd>Ends sentence, starts new paragraph</dd>
               </dl>
               <h4>Navigation</h4>
               <dl>
-                <dt>go to start</dt><dd>Moves cursor to beginning</dd>
-                <dt>go to end</dt><dd>Moves cursor to end</dd>
+                <dt>go to start</dt>
+                <dd>Moves cursor to beginning</dd>
+                <dt>go to end</dt>
+                <dd>Moves cursor to end</dd>
               </dl>
             </div>
             <div>
               <h4>Control</h4>
               <dl>
-                <dt>cancel prompt</dt><dd>Cancel prompt</dd>
-                <dt>send prompt</dt><dd>Send prompt</dd>
-                <dt>end conversation</dt><dd>End the conversation</dd>
+                <dt>cancel prompt</dt>
+                <dd>Cancel prompt</dd>
+                <dt>send prompt</dt>
+                <dd>Send prompt</dd>
+                <dt>end conversation</dt>
+                <dd>End the conversation</dd>
               </dl>
               <h4>Selection</h4>
               <dl>
-                <dt>select all</dt><dd>Selects all text</dd>
-                <dt>unselect selection</dt><dd>Collapses selection, keeps text</dd>
-                <dt>delete selection</dt><dd>Deletes the selected text</dd>
+                <dt>select all</dt>
+                <dd>Selects all text</dd>
+                <dt>unselect selection</dt>
+                <dd>Collapses selection, keeps text</dd>
+                <dt>delete selection</dt>
+                <dd>Deletes the selected text</dd>
               </dl>
               <h4>History</h4>
               <dl>
-                <dt>undo it</dt><dd>Undoes last action</dd>
-                <dt>redo it</dt><dd>Redoes last undone action</dd>
+                <dt>undo it</dt>
+                <dd>Undoes last action</dd>
+                <dt>redo it</dt>
+                <dd>Redoes last undone action</dd>
               </dl>
             </div>
           </div>
@@ -625,7 +697,8 @@
             <button id="dictate-btn" title="Click to dictate (Ctrl+R)" tabindex="-1">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                <path
+                  d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             </button>
             <button id="commands-btn" title="Voice commands cheat sheet" tabindex="-1">&#x1f5e3;&#xfe0f;</button>
@@ -647,13 +720,12 @@
       <div class="container" id="tts-container">
         <div class="history-bar">
           <span class="history-label">History</span>
-          <select class="history-select" id="response-history" title="Load a past response (Alt+Up / Alt+Down also works)"></select>
-          <button class="history-clear" id="response-history-clear" title="Clear response history" tabindex="-1">Clear</button>
+          <select class="history-select" id="response-history"
+            title="Load a past response (Alt+Up / Alt+Down also works)"></select>
+          <button class="history-clear" id="response-history-clear" title="Clear response history"
+            tabindex="-1">Clear</button>
         </div>
-        <textarea
-          id="output-text"
-          placeholder="Type text here or wait for a response..."
-        ></textarea>
+        <textarea id="output-text" placeholder="Type text here or wait for a response..."></textarea>
         <div class="commands-panel" id="tts-commands-panel">
           <button class="close-panel" id="tts-close-panel" title="Close">&times;</button>
           <h3>Voice Commands</h3>
@@ -661,12 +733,15 @@
             <div>
               <h4>Playback</h4>
               <dl>
-                <dt>play it</dt><dd>Play the response</dd>
-                <dt>stop it</dt><dd>Stop playback</dd>
+                <dt>play it</dt>
+                <dd>Play the response</dd>
+                <dt>stop it</dt>
+                <dd>Stop playback</dd>
               </dl>
               <h4>Control</h4>
               <dl>
-                <dt>got it</dt><dd>Continue to next prompt</dd>
+                <dt>got it</dt>
+                <dd>Continue to next prompt</dd>
               </dl>
             </div>
           </div>
@@ -676,7 +751,8 @@
             <button id="tts-dictate-btn" title="Click to dictate (Ctrl+R)" tabindex="-1">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                <path
+                  d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             </button>
             <button id="tts-commands-btn" title="Voice commands cheat sheet" tabindex="-1">&#x1f5e3;&#xfe0f;</button>
@@ -708,823 +784,881 @@
         </div>
       </div>
     </div>
-    </div><!-- /panels-row -->
+  </div><!-- /panels-row -->
 
-    <div class="end-bar">
-      <button id="end-btn">End conversation</button>
-    </div>
+  <div class="end-bar">
+    <button id="end-btn">End conversation</button>
+  </div>
 
-    <script>
-      /* ====================================
-         Splitter
-         ==================================== */
-      const splitter = document.getElementById('splitter');
-      const sttPanel = document.getElementById('stt-panel');
-      const ttsPanel = document.getElementById('tts-panel');
+  <script>
+    /* ====================================
+       Splitter
+       ==================================== */
+    const splitter = document.getElementById('splitter');
+    const sttPanel = document.getElementById('stt-panel');
+    const ttsPanel = document.getElementById('tts-panel');
 
-      let isDragging = false;
+    let isDragging = false;
 
-      splitter.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        splitter.classList.add('dragging');
-        e.preventDefault();
-      });
+    splitter.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      splitter.classList.add('dragging');
+      e.preventDefault();
+    });
 
-      document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const leftPct = Math.max(15, Math.min(85, (e.clientX / document.body.clientWidth) * 100));
-        sttPanel.style.flex = 'none';
-        ttsPanel.style.flex = 'none';
-        sttPanel.style.width = leftPct + '%';
-        ttsPanel.style.width = (100 - leftPct) + '%';
-      });
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const leftPct = Math.max(15, Math.min(85, (e.clientX / document.body.clientWidth) * 100));
+      sttPanel.style.flex = 'none';
+      ttsPanel.style.flex = 'none';
+      sttPanel.style.width = leftPct + '%';
+      ttsPanel.style.width = (100 - leftPct) + '%';
+    });
 
-      document.addEventListener('mouseup', () => {
-        if (isDragging) {
-          isDragging = false;
-          splitter.classList.remove('dragging');
-        }
-      });
-
-      /* ====================================
-         WebSocket transport
-         ==================================== */
-      let currentMode = null;
-      let socket = null;
-
-      function sendSocket(msg) {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify(msg));
-        }
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        splitter.classList.remove('dragging');
       }
+    });
 
-      /* ====================================
-         End conversation
-         ==================================== */
-      document.getElementById('end-btn').onclick = async () => {
-        if (isRecording) toggleDictation();
-        synth.cancel();
-        if (currentMode === 'tts') {
-          sendSocket({ type: 'close' });
-        } else if (currentMode === 'stt') {
-          sendSocket({ type: 'cancel' });
-        }
-        await fetch('/api/shutdown', { method: 'POST' }).catch(() => {});
-        document.title = 'Conversation ended';
-        document.body.innerHTML = '<p style="font-family:system-ui;color:#888;text-align:center;margin-top:40px">Conversation ended. You can close this tab.</p>';
-      };
+    /* ====================================
+       WebSocket transport
+       ==================================== */
+    let currentMode = null;
+    let socket = null;
 
-      /* ====================================
-         History (prompts + responses)
-         ==================================== */
-      const HIST_PROMPTS = '__stts__history_prompts';
-      const HIST_RESPONSES = '__stts__history_responses';
-      const HIST_MAX = 50;
-
-      function loadHistory(key) {
-        try {
-          const raw = localStorage.getItem(key);
-          const arr = raw ? JSON.parse(raw) : [];
-          return Array.isArray(arr) ? arr : [];
-        } catch {
-          return [];
-        }
+    function sendSocket(msg) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(msg));
       }
-
-      function saveHistory(key, arr) {
-        const trimmed = arr.slice(-HIST_MAX);
-        localStorage.setItem(key, JSON.stringify(trimmed));
-      }
-
-      function addToHistory(key, value) {
-        const v = (value || '').trim();
-        if (!v) return;
-        const arr = loadHistory(key);
-        if (arr.length && arr[arr.length - 1] === v) return;
-        arr.push(v);
-        saveHistory(key, arr);
-      }
-
-      function renderHistory(selectEl, key) {
-        const arr = loadHistory(key);
-        selectEl.innerHTML = '';
-        const ph = document.createElement('option');
-        ph.value = '';
-        ph.textContent = arr.length ? `— ${arr.length} entr${arr.length === 1 ? 'y' : 'ies'} —` : '— no history —';
-        ph.selected = true;
-        selectEl.appendChild(ph);
-        for (let i = arr.length - 1; i >= 0; i--) {
-          const opt = document.createElement('option');
-          opt.value = String(i);
-          const flat = arr[i].replace(/\s+/g, ' ');
-          const preview = flat.slice(0, 80);
-          opt.textContent = `${arr.length - i}. ${preview}${flat.length > 80 ? '…' : ''}`;
-          selectEl.appendChild(opt);
-        }
-      }
-
-      function bindHistory({ key, selectId, clearId, getTarget, onLoad }) {
-        const selectEl = document.getElementById(selectId);
-        const clearEl = document.getElementById(clearId);
-        renderHistory(selectEl, key);
-
-        selectEl.onchange = () => {
-          if (selectEl.value === '') return;
-          const arr = loadHistory(key);
-          const idx = parseInt(selectEl.value, 10);
-          if (Number.isFinite(idx) && arr[idx] !== undefined) {
-            const target = getTarget();
-            target.value = arr[idx];
-            if (onLoad) onLoad(arr[idx]);
-            target.focus();
-            try { target.setSelectionRange(target.value.length, target.value.length); } catch {}
-          }
-          selectEl.selectedIndex = 0;
-        };
-
-        clearEl.onmousedown = (e) => e.preventDefault();
-        clearEl.onclick = () => {
-          if (!loadHistory(key).length) return;
-          if (!confirm('Clear this history?')) return;
-          localStorage.removeItem(key);
-          renderHistory(selectEl, key);
-        };
-
-        const target = getTarget();
-        let navIdx = -1;     // -1 = live draft; 0..n-1 = entry from end
-        let savedDraft = '';
-
-        target.addEventListener('keydown', (e) => {
-          if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
-          const arr = loadHistory(key);
-          if (!arr.length) return;
-          e.preventDefault();
-          if (e.key === 'ArrowUp') {
-            if (navIdx === -1) savedDraft = target.value;
-            if (navIdx < arr.length - 1) navIdx++;
-            target.value = arr[arr.length - 1 - navIdx];
-          } else {
-            if (navIdx === -1) return;
-            navIdx--;
-            target.value = navIdx === -1 ? savedDraft : arr[arr.length - 1 - navIdx];
-          }
-          if (onLoad) onLoad(target.value);
-          try { target.setSelectionRange(target.value.length, target.value.length); } catch {}
-        });
-
-        target.addEventListener('input', () => { navIdx = -1; });
-
-        return {
-          refresh: () => renderHistory(selectEl, key),
-          resetNav: () => { navIdx = -1; savedDraft = ''; },
-        };
-      }
-
-      /* ====================================
-         STT
-         ==================================== */
-      const input = document.getElementById('prompt-input');
-      const sendBtn = document.getElementById('send-btn');
-      const dictateBtn = document.getElementById('dictate-btn');
-      const commandsBtn = document.getElementById('commands-btn');
-      const commandsPanel = document.getElementById('commands-panel');
-      const closePanelBtn = document.getElementById('close-panel');
-      const sttStatus = document.getElementById('stt-status');
-      const sttContainer = document.getElementById('stt-container');
-      const sttLabel = document.getElementById('stt-label');
-
-      let isRecording = false;
-      let toggleDictation = () => {};
-
-      const promptHistory = bindHistory({
-        key: HIST_PROMPTS,
-        selectId: 'prompt-history',
-        clearId: 'prompt-history-clear',
-        getTarget: () => input,
-      });
-
-      async function submit() {
-        const text = input.value.trim();
-        if (!text) return;
-        if (isRecording) toggleDictation();
-        localStorage.setItem('__stts__prompt', input.value);
-        addToHistory(HIST_PROMPTS, text);
-        promptHistory.refresh();
-        promptHistory.resetNav();
-        sendSocket({ type: 'complete', text });
-        resetToIdle();
-      }
-
-      async function cancel() {
-        if (isRecording) toggleDictation();
-        sendSocket({ type: 'cancel' });
-        resetToIdle();
-      }
-
-      sendBtn.onclick = submit;
-
-      commandsBtn.onmousedown = (e) => e.preventDefault();
-      commandsBtn.onclick = () => commandsPanel.classList.toggle('open');
-      closePanelBtn.onmousedown = (e) => e.preventDefault();
-      closePanelBtn.onclick = () => commandsPanel.classList.remove('open');
-
-      document.addEventListener('mousedown', (e) => {
-        if (
-          commandsPanel.classList.contains('open') &&
-          !commandsPanel.contains(e.target) &&
-          !commandsBtn.contains(e.target)
-        ) {
-          commandsPanel.classList.remove('open');
-        }
-      });
-
-      input.onkeydown = (e) => {
-        if (currentMode !== 'stt') return;
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          submit();
-        }
-        if (e.key === 'Escape') {
-          if (commandsPanel.classList.contains('open')) {
-            commandsPanel.classList.remove('open');
-          } else if (isRecording) {
-            toggleDictation();
-          } else {
-            cancel();
-          }
-        }
-      };
-
-      let inputTimeout;
-      const COMMAND_REGEX =
-        /(\s*\binsert\s+comma)|(\s*\binsert\s+period)|(\s*\binsert\s+question\s+mark)|(\s*\binsert\s+exclamation\s+mark)|(\s*\binsert\s+tab)|(([,.?!])\s*new\s+paragraph)|(\s*\bnew\s+paragraph)|(\s*\bselect\s+all)|(\s*\bgo\s+to\s+start)|(\s*\bgo\s+to\s+end)|(\s*\bunselect\s+selection)|(\s*\bdelete\s+selection)|(\s*\bundo\s+it)|(\s*\bredo\s+it)|(\s*\bcancel\s+prompt)|(\s*\bsend\s+prompt)|(\s*\bend\s+conversation)/gi;
-
-      function extractCommands(text) {
-        const regex = new RegExp(COMMAND_REGEX.source, COMMAND_REGEX.flags);
-        let processedText = '';
-        let hasRealText = false;
-        let hasTextOutput = false;
-        const effects = [];
-        const replacements = [];
-        let deletesSelection = false;
-        let lastIndex = 0;
-        let match;
-
-        while ((match = regex.exec(text)) !== null) {
-          const before = text.substring(lastIndex, match.index);
-          processedText += before;
-          if (before.trim()) hasRealText = true;
-
-          let sub = '';
-          if (match[1]) { sub = ', '; hasTextOutput = true; }
-          else if (match[2]) { sub = '. '; hasTextOutput = true; }
-          else if (match[3]) { sub = '? '; hasTextOutput = true; }
-          else if (match[4]) { sub = '! '; hasTextOutput = true; }
-          else if (match[5]) { sub = '\t'; hasTextOutput = true; }
-          else if (match[6]) { sub = match[7] + '\n\n'; hasTextOutput = true; }
-          else if (match[8]) { sub = '.\n\n'; hasTextOutput = true; }
-          else if (match[9]) { effects.push(() => input.select()); }
-          else if (match[10]) { effects.push(() => input.setSelectionRange(0, 0)); }
-          else if (match[11]) { effects.push(() => input.setSelectionRange(input.value.length, input.value.length)); }
-          else if (match[12]) { effects.push(() => { const pos = input.selectionStart; input.setSelectionRange(pos, pos); }); }
-          else if (match[13]) { deletesSelection = true; }
-          else if (match[14]) { effects.push(() => document.execCommand('undo', false)); }
-          else if (match[15]) { effects.push(() => document.execCommand('redo', false)); }
-          else if (match[16]) { effects.push(() => cancel()); }
-          else if (match[17]) { effects.push(() => submit()); }
-          else if (match[18]) { effects.push(() => document.getElementById('end-btn').click()); }
-
-          processedText += sub;
-          replacements.push({ start: match.index, end: match.index + match[0].length, sub });
-          lastIndex = regex.lastIndex;
-        }
-
-        processedText += text.substring(lastIndex);
-        if (text.substring(lastIndex).trim()) hasRealText = true;
-
-        return { processedText, replacements, replaceSelection: hasRealText || hasTextOutput, effects, deletesSelection };
-      }
-
-      let isProcessing = false;
-
-      function processInput(smartCursorMovement = false) {
-        const { replacements, effects } = extractCommands(input.value);
-        if (replacements.length) {
-          isProcessing = true;
-          for (let i = replacements.length - 1; i >= 0; i--) {
-            const { start, end, sub } = replacements[i];
-            input.setSelectionRange(start, end);
-            document.execCommand('insertText', false, sub);
-          }
-          if (smartCursorMovement) {
-            const last = replacements[0];
-            const cursorPos = last.start + last.sub.length;
-            input.setSelectionRange(cursorPos, cursorPos);
-          }
-          isProcessing = false;
-        }
-        if (effects.length) {
-          setTimeout(() => effects.forEach(fn => fn()), 0);
-        }
-      }
-
-      input.oninput = (e) => {
-        if (isProcessing) return;
-        if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') return;
-        clearTimeout(inputTimeout);
-        inputTimeout = setTimeout(processInput, 500);
-        localStorage.setItem('__stts__prompt', input.value);
-      };
-
-      const speechRecognition = window['SpeechRecognition'] || window['webkitSpeechRecognition'];
-      if (speechRecognition) {
-        const recognition = new speechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        toggleDictation = () => {
-          if (isRecording) {
-            recognition.stop();
-          } else {
-            recognition.start();
-          }
-        };
-
-        dictateBtn.onmousedown = (e) => e.preventDefault();
-        dictateBtn.onclick = toggleDictation;
-
-        window.onkeydown = (e) => {
-          if (e.ctrlKey && e.key === 'r') {
-            e.preventDefault();
-            if (currentMode === 'tts' && ttsToggleDictation) {
-              ttsToggleDictation();
-            } else {
-              toggleDictation();
-            }
-          }
-          if (e.key === 'Escape' && currentMode === 'tts') {
-            e.preventDefault();
-            if (ttsCommandsPanel.classList.contains('open')) {
-              ttsCommandsPanel.classList.remove('open');
-            } else if (ttsIsRecording) {
-              try { ttsToggleDictation(); } catch {}
-            } else {
-              gotitBtn.click();
-            }
-          }
-        };
-
-        recognition.onstart = () => {
-          isRecording = true;
-          dictateBtn.classList.add('recording');
-          sttContainer.classList.add('listening');
-          sttStatus.classList.add('visible');
-        };
-
-        recognition.onend = () => {
-          isRecording = false;
-          dictateBtn.classList.remove('recording');
-          sttContainer.classList.remove('listening');
-          sttStatus.classList.remove('visible');
-        };
-
-        recognition.onresult = (event) => {
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
-          }
-          if (finalTranscript) {
-            isProcessing = true;
-            const { processedText, replaceSelection, effects, deletesSelection } = extractCommands(finalTranscript);
-            const start = input.selectionStart;
-            const end = input.selectionEnd;
-            const hasSelection = start !== end;
-
-            if (hasSelection && deletesSelection) {
-              input.setSelectionRange(start, end);
-              document.execCommand('delete', false);
-            }
-
-            const insertPos = input.selectionStart;
-            const insertEnd = input.selectionEnd;
-
-            if (insertPos !== insertEnd && !replaceSelection) {
-              input.setSelectionRange(insertEnd, insertEnd);
-            } else if (insertPos !== insertEnd) {
-              input.setSelectionRange(insertPos, insertEnd);
-            }
-
-            if (processedText) {
-              document.execCommand('insertText', false, processedText);
-            }
-
-            isProcessing = false;
-            localStorage.setItem('__stts__prompt', input.value);
-
-            if (effects.length) {
-              setTimeout(() => effects.forEach(fn => fn()), 0);
-            }
-          }
-        };
-
-        recognition.onerror = (event) => {
-          console.error('Speech recognition error', event.error);
-          sttStatus.textContent = 'Error: ' + event.error;
-          setTimeout(() => { sttStatus.textContent = 'Listening...'; }, 3000);
-        };
-      } else {
-        dictateBtn.style.display = 'none';
-      }
-
-      /* ====================================
-         TTS
-         ==================================== */
-      const ttsContainer = document.getElementById('tts-container');
-      const ttsTextarea = document.getElementById('output-text');
-      const playBtn = document.getElementById('play-btn');
-      const stopBtn = document.getElementById('stop-btn');
-      const gotitBtn = document.getElementById('gotit-btn');
-      const refreshBtn = document.getElementById('refresh-btn');
-      const ttsStatus = document.getElementById('tts-status');
-      const ttsLabel = document.getElementById('tts-label');
-      const bars = document.querySelectorAll('.bar');
-      const ttsDictateBtn = document.getElementById('tts-dictate-btn');
-      const ttsCommandsBtn = document.getElementById('tts-commands-btn');
-      const ttsCommandsPanel = document.getElementById('tts-commands-panel');
-      const ttsClosed = document.getElementById('tts-close-panel');
-
-      let ttsIsRecording = false;
-      let ttsToggleDictation = () => {};
-
-      const responseHistory = bindHistory({
-        key: HIST_RESPONSES,
-        selectId: 'response-history',
-        clearId: 'response-history-clear',
-        getTarget: () => ttsTextarea,
-      });
-
-      const synth = window.speechSynthesis;
-      let currentUtterance = null;
-      let hasStarted = false;
-      let isOneshot = false;
-      let userInteracted = false;
-      let isRestarting = false;
-
-      // TTS Commands
-      ttsCommandsBtn.onmousedown = (e) => e.preventDefault();
-      ttsCommandsBtn.onclick = () => ttsCommandsPanel.classList.toggle('open');
-      ttsClosed.onmousedown = (e) => e.preventDefault();
-      ttsClosed.onclick = () => ttsCommandsPanel.classList.remove('open');
-
-      document.addEventListener('mousedown', (e) => {
-        if (
-          ttsCommandsPanel.classList.contains('open') &&
-          !ttsCommandsPanel.contains(e.target) &&
-          !ttsCommandsBtn.contains(e.target)
-        ) {
-          ttsCommandsPanel.classList.remove('open');
-        }
-      });
-
-      const TTS_COMMAND_REGEX = /(\s*\bplay\s+it)|(\s*\bstop\s+it)|(\s*\bgot\s+it)/gi;
-
-      function extractTtsCommands(text) {
-        const regex = new RegExp(TTS_COMMAND_REGEX.source, TTS_COMMAND_REGEX.flags);
-        const effects = [];
-        let match;
-
-        while ((match = regex.exec(text)) !== null) {
-          if (match[1]) { effects.push(() => playBtn.click()); }
-          else if (match[2]) { effects.push(() => stopBtn.click()); }
-          else if (match[3]) { effects.push(() => gotitBtn.click()); }
-        }
-
-        return { effects };
-      }
-
-      // TTS Speech Recognition
-      if (speechRecognition) {
-        const ttsRecognition = new speechRecognition();
-        ttsRecognition.continuous = true;
-        ttsRecognition.interimResults = true;
-
-        ttsToggleDictation = () => {
-          if (ttsIsRecording) {
-            ttsRecognition.stop();
-          } else {
-            ttsRecognition.start();
-          }
-        };
-
-        ttsDictateBtn.onmousedown = (e) => e.preventDefault();
-        ttsDictateBtn.onclick = ttsToggleDictation;
-
-        ttsRecognition.onstart = () => {
-          ttsIsRecording = true;
-          ttsDictateBtn.classList.add('recording');
-          ttsContainer.classList.add('listening');
-        };
-
-        ttsRecognition.onend = () => {
-          ttsIsRecording = false;
-          ttsDictateBtn.classList.remove('recording');
-          ttsContainer.classList.remove('listening');
-        };
-
-        ttsRecognition.onresult = (event) => {
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
-          }
-          if (finalTranscript) {
-            const { effects } = extractTtsCommands(finalTranscript);
-            if (effects.length) {
-              setTimeout(() => effects.forEach(fn => fn()), 0);
-            }
-          }
-        };
-
-        ttsRecognition.onerror = (event) => {
-          console.error('TTS Speech recognition error', event.error);
-        };
-      } else {
-        ttsDictateBtn.style.display = 'none';
-        ttsCommandsBtn.style.display = 'none';
-      }
-
-      refreshBtn.onclick = () => {
-        synth.cancel();
-        location.reload();
-      };
-
-      playBtn.onclick = () => {
-        userInteracted = true;
-        hasStarted = false;
-        isRestarting = true;
-        synth.cancel();
-        isRestarting = false;
-        startSpeaking();
-      };
-
-      function stopSpeaking() {
-        userInteracted = true;
-        synth.cancel();
-        isOneshot = false;
-        hasStarted = false;
-        playBtn.disabled = false;
-        stopBtn.disabled = true;
-        ttsContainer.classList.remove('speaking');
-        bars.forEach((b) => b.classList.remove('animating'));
-        ttsStatus.textContent = 'Stopped. Press Play to listen again.';
-      }
-
-      stopBtn.onclick = stopSpeaking;
-
-      function autoOrManualClose() {
-        synth.cancel();
-        if (ttsIsRecording) { try { ttsToggleDictation(); } catch {} }
-        gotitBtn.disabled = true;
+    }
+
+    /* ====================================
+       End conversation
+       ==================================== */
+    document.getElementById('end-btn').onclick = async () => {
+      if (isRecording) toggleDictation();
+      synth.cancel();
+      if (currentMode === 'tts') {
         sendSocket({ type: 'close' });
-        resetToIdle();
+      } else if (currentMode === 'stt') {
+        sendSocket({ type: 'cancel' });
+      }
+      await fetch('/api/shutdown', { method: 'POST' }).catch(() => { });
+      document.title = 'Conversation ended';
+      document.body.innerHTML = '<p style="font-family:system-ui;color:#888;text-align:center;margin-top:40px">Conversation ended. You can close this tab.</p>';
+    };
+
+    /* ====================================
+       History (prompts + responses)
+       ==================================== */
+    const HIST_PROMPTS = '__stts__history_prompts';
+    const HIST_RESPONSES = '__stts__history_responses';
+    const HIST_MAX = 50;
+
+    function loadHistory(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(key, arr) {
+      const trimmed = arr.slice(-HIST_MAX);
+      localStorage.setItem(key, JSON.stringify(trimmed));
+    }
+
+    function addToHistory(key, value) {
+      const v = (value || '').trim();
+      if (!v) return;
+      const arr = loadHistory(key);
+      if (arr.length && arr[arr.length - 1] === v) return;
+      arr.push(v);
+      saveHistory(key, arr);
+    }
+
+    function renderHistory(selectEl, key) {
+      const arr = loadHistory(key);
+      selectEl.innerHTML = '';
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = arr.length ? `— ${arr.length} entr${arr.length === 1 ? 'y' : 'ies'} —` : '— no history —';
+      ph.selected = true;
+      selectEl.appendChild(ph);
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        const flat = arr[i].replace(/\s+/g, ' ');
+        const preview = flat.slice(0, 80);
+        opt.textContent = `${arr.length - i}. ${preview}${flat.length > 80 ? '…' : ''}`;
+        selectEl.appendChild(opt);
+      }
+    }
+
+    function bindHistory({ key, selectId, clearId, getTarget, onLoad }) {
+      const selectEl = document.getElementById(selectId);
+      const clearEl = document.getElementById(clearId);
+      renderHistory(selectEl, key);
+
+      selectEl.onchange = () => {
+        if (selectEl.value === '') return;
+        const arr = loadHistory(key);
+        const idx = parseInt(selectEl.value, 10);
+        if (Number.isFinite(idx) && arr[idx] !== undefined) {
+          const target = getTarget();
+          target.value = arr[idx];
+          if (onLoad) onLoad(arr[idx]);
+          target.focus();
+          try { target.setSelectionRange(target.value.length, target.value.length); } catch { }
+        }
+        selectEl.selectedIndex = 0;
+      };
+
+      clearEl.onmousedown = (e) => e.preventDefault();
+      clearEl.onclick = () => {
+        if (!loadHistory(key).length) return;
+        if (!confirm('Clear this history?')) return;
+        localStorage.removeItem(key);
+        renderHistory(selectEl, key);
+      };
+
+      const target = getTarget();
+      let navIdx = -1;     // -1 = live draft; 0..n-1 = entry from end
+      let savedDraft = '';
+
+      target.addEventListener('keydown', (e) => {
+        if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+        const arr = loadHistory(key);
+        if (!arr.length) return;
+        e.preventDefault();
+        if (e.key === 'ArrowUp') {
+          if (navIdx === -1) savedDraft = target.value;
+          if (navIdx < arr.length - 1) navIdx++;
+          target.value = arr[arr.length - 1 - navIdx];
+        } else {
+          if (navIdx === -1) return;
+          navIdx--;
+          target.value = navIdx === -1 ? savedDraft : arr[arr.length - 1 - navIdx];
+        }
+        if (onLoad) onLoad(target.value);
+        try { target.setSelectionRange(target.value.length, target.value.length); } catch { }
+      });
+
+      target.addEventListener('input', () => { navIdx = -1; });
+
+      return {
+        refresh: () => renderHistory(selectEl, key),
+        resetNav: () => { navIdx = -1; savedDraft = ''; },
+      };
+    }
+
+    /* ====================================
+       STT
+       ==================================== */
+    const input = document.getElementById('prompt-input');
+    const sendBtn = document.getElementById('send-btn');
+    const dictateBtn = document.getElementById('dictate-btn');
+    const commandsBtn = document.getElementById('commands-btn');
+    const commandsPanel = document.getElementById('commands-panel');
+    const closePanelBtn = document.getElementById('close-panel');
+    const sttStatus = document.getElementById('stt-status');
+    const sttContainer = document.getElementById('stt-container');
+    const sttLabel = document.getElementById('stt-label');
+
+    let isRecording = false;
+    let toggleDictation = () => { };
+
+    const promptHistory = bindHistory({
+      key: HIST_PROMPTS,
+      selectId: 'prompt-history',
+      clearId: 'prompt-history-clear',
+      getTarget: () => input,
+    });
+
+    async function submit() {
+      const text = input.value.trim();
+      if (!text) return;
+      if (isRecording) toggleDictation();
+      localStorage.setItem('__stts__prompt', input.value);
+      addToHistory(HIST_PROMPTS, text);
+      promptHistory.refresh();
+      promptHistory.resetNav();
+      sendSocket({ type: 'complete', text });
+      resetToIdle();
+    }
+
+    async function cancel() {
+      if (isRecording) toggleDictation();
+      sendSocket({ type: 'cancel' });
+      resetToIdle();
+    }
+
+    sendBtn.onclick = submit;
+
+    commandsBtn.onmousedown = (e) => e.preventDefault();
+    commandsBtn.onclick = () => commandsPanel.classList.toggle('open');
+    closePanelBtn.onmousedown = (e) => e.preventDefault();
+    closePanelBtn.onclick = () => commandsPanel.classList.remove('open');
+
+    document.addEventListener('mousedown', (e) => {
+      if (
+        commandsPanel.classList.contains('open') &&
+        !commandsPanel.contains(e.target) &&
+        !commandsBtn.contains(e.target)
+      ) {
+        commandsPanel.classList.remove('open');
+      }
+    });
+
+    input.onkeydown = (e) => {
+      if (currentMode !== 'stt') return;
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submit();
+      }
+      if (e.key === 'Escape') {
+        if (commandsPanel.classList.contains('open')) {
+          commandsPanel.classList.remove('open');
+        } else if (isRecording) {
+          toggleDictation();
+        } else {
+          cancel();
+        }
+      }
+    };
+
+    let inputTimeout;
+    const COMMAND_REGEX =
+      /(\s*\binsert\s+comma)|(\s*\binsert\s+period)|(\s*\binsert\s+question\s+mark)|(\s*\binsert\s+exclamation\s+mark)|(\s*\binsert\s+tab)|(([,.?!])\s*new\s+paragraph)|(\s*\bnew\s+paragraph)|(\s*\bselect\s+all)|(\s*\bgo\s+to\s+start)|(\s*\bgo\s+to\s+end)|(\s*\bunselect\s+selection)|(\s*\bdelete\s+selection)|(\s*\bundo\s+it)|(\s*\bredo\s+it)|(\s*\bcancel\s+prompt)|(\s*\bsend\s+prompt)|(\s*\bend\s+conversation)/gi;
+
+    function extractCommands(text) {
+      const regex = new RegExp(COMMAND_REGEX.source, COMMAND_REGEX.flags);
+      let processedText = '';
+      let hasRealText = false;
+      let hasTextOutput = false;
+      const effects = [];
+      const replacements = [];
+      let deletesSelection = false;
+      let lastIndex = 0;
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        const before = text.substring(lastIndex, match.index);
+        processedText += before;
+        if (before.trim()) hasRealText = true;
+
+        let sub = '';
+        if (match[1]) { sub = ', '; hasTextOutput = true; }
+        else if (match[2]) { sub = '. '; hasTextOutput = true; }
+        else if (match[3]) { sub = '? '; hasTextOutput = true; }
+        else if (match[4]) { sub = '! '; hasTextOutput = true; }
+        else if (match[5]) { sub = '\t'; hasTextOutput = true; }
+        else if (match[6]) { sub = match[7] + '\n\n'; hasTextOutput = true; }
+        else if (match[8]) { sub = '.\n\n'; hasTextOutput = true; }
+        else if (match[9]) { effects.push(() => input.select()); }
+        else if (match[10]) { effects.push(() => input.setSelectionRange(0, 0)); }
+        else if (match[11]) { effects.push(() => input.setSelectionRange(input.value.length, input.value.length)); }
+        else if (match[12]) { effects.push(() => { const pos = input.selectionStart; input.setSelectionRange(pos, pos); }); }
+        else if (match[13]) { deletesSelection = true; }
+        else if (match[14]) { effects.push(() => document.execCommand('undo', false)); }
+        else if (match[15]) { effects.push(() => document.execCommand('redo', false)); }
+        else if (match[16]) { effects.push(() => cancel()); }
+        else if (match[17]) { effects.push(() => submit()); }
+        else if (match[18]) { effects.push(() => document.getElementById('end-btn').click()); }
+
+        processedText += sub;
+        replacements.push({ start: match.index, end: match.index + match[0].length, sub });
+        lastIndex = regex.lastIndex;
       }
 
-      gotitBtn.onclick = autoOrManualClose;
+      processedText += text.substring(lastIndex);
+      if (text.substring(lastIndex).trim()) hasRealText = true;
 
-      function startSpeaking() {
-        const textToSpeak = ttsTextarea.value.trim();
-        if (hasStarted || !textToSpeak) return;
+      return { processedText, replacements, replaceSelection: hasRealText || hasTextOutput, effects, deletesSelection };
+    }
 
-        const voices = synth.getVoices();
-        if (voices.length === 0) {
-          ttsStatus.textContent = 'Waiting for system voices...';
-          return;
+    let isProcessing = false;
+
+    function processInput(smartCursorMovement = false) {
+      const { replacements, effects } = extractCommands(input.value);
+      if (replacements.length) {
+        isProcessing = true;
+        for (let i = replacements.length - 1; i >= 0; i--) {
+          const { start, end, sub } = replacements[i];
+          input.setSelectionRange(start, end);
+          document.execCommand('insertText', false, sub);
         }
+        if (smartCursorMovement) {
+          const last = replacements[0];
+          const cursorPos = last.start + last.sub.length;
+          input.setSelectionRange(cursorPos, cursorPos);
+        }
+        isProcessing = false;
+      }
+      if (effects.length) {
+        setTimeout(() => effects.forEach(fn => fn()), 0);
+      }
+    }
 
-        hasStarted = true;
-        playBtn.disabled = true;
-        stopBtn.disabled = false;
-        refreshBtn.style.display = 'none';
-        ttsStatus.textContent = 'Speaking...';
+    input.oninput = (e) => {
+      if (isProcessing) return;
+      if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') return;
+      clearTimeout(inputTimeout);
+      inputTimeout = setTimeout(processInput, 500);
+      localStorage.setItem('__stts__prompt', input.value);
+    };
 
-        synth.cancel();
+    const speechRecognition = window['SpeechRecognition'] || window['webkitSpeechRecognition'];
+    if (speechRecognition) {
+      const recognition = new speechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
-        currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
+      toggleDictation = () => {
+        if (isRecording) {
+          recognition.stop();
+        } else {
+          recognition.start();
+        }
+      };
 
-        const voice =
-          voices.find((v) => v.lang === 'en-US') ||
-          voices.find((v) => v.lang.startsWith('en-US')) ||
-          voices.find((v) => v.lang.startsWith('en')) ||
-          voices[0];
+      dictateBtn.onmousedown = (e) => e.preventDefault();
+      dictateBtn.onclick = toggleDictation;
 
-        if (voice) currentUtterance.voice = voice;
-
-        currentUtterance.onstart = () => {
-          ttsContainer.classList.add('speaking');
-          bars.forEach((b) => b.classList.add('animating'));
-        };
-
-        currentUtterance.onend = () => {
-          ttsContainer.classList.remove('speaking');
-          bars.forEach((b) => b.classList.remove('animating'));
-          playBtn.disabled = false;
-          stopBtn.disabled = true;
-          hasStarted = false;
-          if (currentMode === 'tts' && isOneshot && !userInteracted) {
-            ttsStatus.textContent = 'Finished. Continuing...';
-            autoOrManualClose();
+      window.onkeydown = (e) => {
+        if (e.ctrlKey && e.key === 'r') {
+          e.preventDefault();
+          if (currentMode === 'tts' && ttsToggleDictation) {
+            ttsToggleDictation();
           } else {
-            ttsStatus.textContent = 'Finished. Play again or click "Got it!" to continue.';
+            toggleDictation();
           }
-        };
-
-        currentUtterance.onerror = (e) => {
-          if (isRestarting) return;
-          console.error('Speech error:', e.error);
-          ttsContainer.classList.remove('speaking');
-          bars.forEach((b) => b.classList.remove('animating'));
-          ttsStatus.textContent = (e.error === 'interrupted' || e.error === 'canceled') ? 'Stopped. Press Play to listen again.' : 'Error: ' + e.error;
-          playBtn.disabled = false;
-          stopBtn.disabled = true;
-          hasStarted = false;
-        };
-
-        synth.speak(currentUtterance);
-      }
-
-      function ttsStart() {
-        const voices = synth.getVoices();
-        if (voices.length > 0 && ttsTextarea.value.trim()) {
-          startSpeaking();
-          return true;
         }
-        return false;
+        if (e.key === 'Escape' && currentMode === 'tts') {
+          e.preventDefault();
+          if (ttsCommandsPanel.classList.contains('open')) {
+            ttsCommandsPanel.classList.remove('open');
+          } else if (ttsIsRecording) {
+            try { ttsToggleDictation(); } catch { }
+          } else {
+            gotitBtn.click();
+          }
+        }
+      };
+
+      recognition.onstart = () => {
+        isRecording = true;
+        dictateBtn.classList.add('recording');
+        sttContainer.classList.add('listening');
+        sttStatus.classList.add('visible');
+      };
+
+      recognition.onend = () => {
+        isRecording = false;
+        dictateBtn.classList.remove('recording');
+        sttContainer.classList.remove('listening');
+        sttStatus.classList.remove('visible');
+      };
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          isProcessing = true;
+          const { processedText, replaceSelection, effects, deletesSelection } = extractCommands(finalTranscript);
+          const start = input.selectionStart;
+          const end = input.selectionEnd;
+          const hasSelection = start !== end;
+
+          if (hasSelection && deletesSelection) {
+            input.setSelectionRange(start, end);
+            document.execCommand('delete', false);
+          }
+
+          const insertPos = input.selectionStart;
+          const insertEnd = input.selectionEnd;
+
+          if (insertPos !== insertEnd && !replaceSelection) {
+            input.setSelectionRange(insertEnd, insertEnd);
+          } else if (insertPos !== insertEnd) {
+            input.setSelectionRange(insertPos, insertEnd);
+          }
+
+          if (processedText) {
+            document.execCommand('insertText', false, processedText);
+          }
+
+          isProcessing = false;
+          localStorage.setItem('__stts__prompt', input.value);
+
+          if (effects.length) {
+            setTimeout(() => effects.forEach(fn => fn()), 0);
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+        sttStatus.textContent = 'Error: ' + event.error;
+        setTimeout(() => { sttStatus.textContent = 'Listening...'; }, 3000);
+      };
+    } else {
+      dictateBtn.style.display = 'none';
+    }
+
+    /* ====================================
+       TTS
+       ==================================== */
+    const ttsContainer = document.getElementById('tts-container');
+    const ttsTextarea = document.getElementById('output-text');
+    const playBtn = document.getElementById('play-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const gotitBtn = document.getElementById('gotit-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const ttsStatus = document.getElementById('tts-status');
+    const ttsLabel = document.getElementById('tts-label');
+    const bars = document.querySelectorAll('.bar');
+    const ttsDictateBtn = document.getElementById('tts-dictate-btn');
+    const ttsCommandsBtn = document.getElementById('tts-commands-btn');
+    const ttsCommandsPanel = document.getElementById('tts-commands-panel');
+    const ttsClosed = document.getElementById('tts-close-panel');
+
+    let ttsIsRecording = false;
+    let ttsToggleDictation = () => { };
+
+    const responseHistory = bindHistory({
+      key: HIST_RESPONSES,
+      selectId: 'response-history',
+      clearId: 'response-history-clear',
+      getTarget: () => ttsTextarea,
+    });
+
+    const synth = window.speechSynthesis;
+    let currentUtterance = null;
+    let hasStarted = false;
+    let isOneshot = false;
+    let userInteracted = false;
+    let isRestarting = false;
+
+    // TTS Commands
+    ttsCommandsBtn.onmousedown = (e) => e.preventDefault();
+    ttsCommandsBtn.onclick = () => ttsCommandsPanel.classList.toggle('open');
+    ttsClosed.onmousedown = (e) => e.preventDefault();
+    ttsClosed.onclick = () => ttsCommandsPanel.classList.remove('open');
+
+    document.addEventListener('mousedown', (e) => {
+      if (
+        ttsCommandsPanel.classList.contains('open') &&
+        !ttsCommandsPanel.contains(e.target) &&
+        !ttsCommandsBtn.contains(e.target)
+      ) {
+        ttsCommandsPanel.classList.remove('open');
+      }
+    });
+
+    const TTS_COMMAND_REGEX = /(\s*\bplay\s+it)|(\s*\bstop\s+it)|(\s*\bgot\s+it)/gi;
+
+    function extractTtsCommands(text) {
+      const regex = new RegExp(TTS_COMMAND_REGEX.source, TTS_COMMAND_REGEX.flags);
+      const effects = [];
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        if (match[1]) { effects.push(() => playBtn.click()); }
+        else if (match[2]) { effects.push(() => stopBtn.click()); }
+        else if (match[3]) { effects.push(() => gotitBtn.click()); }
       }
 
-      // Nudge the TTS engine on load
-      (function wakeUp() {
-        const dummy = new SpeechSynthesisUtterance('');
-        dummy.volume = 0;
-        synth.speak(dummy);
-        synth.cancel();
-      })();
+      return { effects };
+    }
 
-      if (synth.onvoiceschanged !== undefined) {
-        synth.onvoiceschanged = () => ttsStart();
-      }
+    // TTS Speech Recognition
+    if (speechRecognition) {
+      const ttsRecognition = new speechRecognition();
+      ttsRecognition.continuous = true;
+      ttsRecognition.interimResults = true;
 
-      /* ====================================
-         Idle + request loop
-         ==================================== */
+      ttsToggleDictation = () => {
+        if (ttsIsRecording) {
+          ttsRecognition.stop();
+        } else {
+          ttsRecognition.start();
+        }
+      };
 
-      function resetToIdle() {
-        currentMode = null;
-        synth.cancel();
-        if (isRecording) { try { toggleDictation(); } catch {} }
-        if (ttsIsRecording) { try { ttsToggleDictation(); } catch {} }
+      ttsDictateBtn.onmousedown = (e) => e.preventDefault();
+      ttsDictateBtn.onclick = ttsToggleDictation;
 
-        sttPanel.classList.remove('active-mode');
-        sttPanel.classList.add('inactive');
-        sttLabel.classList.remove('active');
+      ttsRecognition.onstart = () => {
+        ttsIsRecording = true;
+        ttsDictateBtn.classList.add('recording');
+        ttsContainer.classList.add('listening');
+      };
 
-        ttsPanel.classList.remove('active-mode');
-        ttsPanel.classList.add('inactive');
-        ttsLabel.classList.remove('active');
-
-        // Reset button visibility
-        dictateBtn.style.opacity = '0.4';
-        dictateBtn.style.pointerEvents = 'none';
-        commandsBtn.style.opacity = '0.4';
-        commandsBtn.style.pointerEvents = 'none';
-        ttsDictateBtn.style.opacity = '0.4';
-        ttsDictateBtn.style.pointerEvents = 'none';
-        ttsCommandsBtn.style.opacity = '0.4';
-        ttsCommandsBtn.style.pointerEvents = 'none';
-
-        hasStarted = false;
-        ttsContainer.classList.remove('speaking');
+      ttsRecognition.onend = () => {
+        ttsIsRecording = false;
+        ttsDictateBtn.classList.remove('recording');
         ttsContainer.classList.remove('listening');
+      };
+
+      ttsRecognition.onresult = (event) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          const { effects } = extractTtsCommands(finalTranscript);
+          if (effects.length) {
+            setTimeout(() => effects.forEach(fn => fn()), 0);
+          }
+        }
+      };
+
+      ttsRecognition.onerror = (event) => {
+        console.error('TTS Speech recognition error', event.error);
+      };
+    } else {
+      ttsDictateBtn.style.display = 'none';
+      ttsCommandsBtn.style.display = 'none';
+    }
+
+    refreshBtn.onclick = () => {
+      synth.cancel();
+      location.reload();
+    };
+
+    playBtn.onclick = () => {
+      userInteracted = true;
+      hasStarted = false;
+      isRestarting = true;
+      synth.cancel();
+      isRestarting = false;
+      startSpeaking();
+    };
+
+    function stopSpeaking() {
+      userInteracted = true;
+      synth.cancel();
+      isOneshot = false;
+      hasStarted = false;
+      playBtn.disabled = false;
+      stopBtn.disabled = true;
+      ttsContainer.classList.remove('speaking');
+      bars.forEach((b) => b.classList.remove('animating'));
+      ttsStatus.textContent = 'Stopped. Press Play to listen again.';
+    }
+
+    stopBtn.onclick = stopSpeaking;
+
+    function autoOrManualClose() {
+      synth.cancel();
+      if (ttsIsRecording) { try { ttsToggleDictation(); } catch { } }
+      gotitBtn.disabled = true;
+      sendSocket({ type: 'close' });
+      resetToIdle();
+    }
+
+    gotitBtn.onclick = autoOrManualClose;
+
+    function startSpeaking() {
+      const textToSpeak = ttsTextarea.value.trim();
+      if (hasStarted || !textToSpeak) return;
+
+      const voices = synth.getVoices();
+      if (voices.length === 0) {
+        ttsStatus.textContent = 'Waiting for system voices...';
+        return;
+      }
+
+      hasStarted = true;
+      playBtn.disabled = true;
+      stopBtn.disabled = false;
+      refreshBtn.style.display = 'none';
+      ttsStatus.textContent = 'Speaking...';
+
+      synth.cancel();
+
+      currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
+
+      const voice =
+        voices.find((v) => v.lang === 'en-US') ||
+        voices.find((v) => v.lang.startsWith('en-US')) ||
+        voices.find((v) => v.lang.startsWith('en')) ||
+        voices[0];
+
+      if (voice) currentUtterance.voice = voice;
+
+      currentUtterance.onstart = () => {
+        ttsContainer.classList.add('speaking');
+        bars.forEach((b) => b.classList.add('animating'));
+      };
+
+      currentUtterance.onend = () => {
+        ttsContainer.classList.remove('speaking');
         bars.forEach((b) => b.classList.remove('animating'));
         playBtn.disabled = false;
         stopBtn.disabled = true;
-        gotitBtn.disabled = true;
-        ttsStatus.textContent = 'Waiting...';
-        sttStatus.classList.remove('visible');
-
-        document.title = 'Waiting for next request...';
-      }
-
-      function activateStt(config) {
-        currentMode = 'stt';
-        sttPanel.classList.remove('inactive');
-        sttPanel.classList.add('active-mode');
-        sttLabel.classList.add('active');
-        ttsPanel.classList.add('inactive');
-        ttsPanel.classList.remove('active-mode');
-        ttsLabel.classList.remove('active');
-
-        // Enable STT buttons in active state
-        dictateBtn.style.opacity = '1';
-        dictateBtn.style.pointerEvents = 'auto';
-        commandsBtn.style.opacity = '1';
-        commandsBtn.style.pointerEvents = 'auto';
-
-        // Disable TTS buttons in inactive state
-        ttsDictateBtn.style.opacity = '0.4';
-        ttsDictateBtn.style.pointerEvents = 'none';
-        ttsCommandsBtn.style.opacity = '0.4';
-        ttsCommandsBtn.style.pointerEvents = 'none';
-
-        input.value = config.initialText || '';
-        if (config.initialText) processInput(false);
-        if (config.title) document.title = config.title;
-        sendBtn.textContent = config.action || 'Send';
-
-        if (!isRecording) {
-          try { toggleDictation(); } catch {}
-        }
-        input.focus();
-      }
-
-      async function activateTts(config) {
-        currentMode = 'tts';
-        ttsPanel.classList.remove('inactive');
-        ttsPanel.classList.add('active-mode');
-        ttsLabel.classList.add('active');
-        sttPanel.classList.add('inactive');
-        sttPanel.classList.remove('active-mode');
-        sttLabel.classList.remove('active');
-
-        // Enable TTS buttons in active state
-        ttsDictateBtn.style.opacity = '1';
-        ttsDictateBtn.style.pointerEvents = 'auto';
-        ttsCommandsBtn.style.opacity = '1';
-        ttsCommandsBtn.style.pointerEvents = 'auto';
-
-        // Disable STT buttons in inactive state
-        dictateBtn.style.opacity = '0.4';
-        dictateBtn.style.pointerEvents = 'none';
-        commandsBtn.style.opacity = '0.4';
-        commandsBtn.style.pointerEvents = 'none';
-
-        ttsTextarea.value = config.text || '';
-        if (config.text) {
-          addToHistory(HIST_RESPONSES, config.text);
-          responseHistory.refresh();
-          responseHistory.resetNav();
-        }
-        if (config.title) document.title = config.title;
-        isOneshot = !!config.oneshot;
-        userInteracted = false;
-        gotitBtn.disabled = false;
         hasStarted = false;
+        if (currentMode === 'tts' && isOneshot && !userInteracted) {
+          ttsStatus.textContent = 'Finished. Continuing...';
+          autoOrManualClose();
+        } else {
+          ttsStatus.textContent = 'Finished. Play again or click "Got it!" to continue.';
+        }
+      };
+
+      currentUtterance.onerror = (e) => {
+        if (isRestarting) return;
+        console.error('Speech error:', e.error);
+        ttsContainer.classList.remove('speaking');
+        bars.forEach((b) => b.classList.remove('animating'));
+        ttsStatus.textContent = (e.error === 'interrupted' || e.error === 'canceled') ? 'Stopped. Press Play to listen again.' : 'Error: ' + e.error;
         playBtn.disabled = false;
         stopBtn.disabled = true;
+        hasStarted = false;
+      };
 
-        if (!ttsIsRecording) {
-          try { ttsToggleDictation(); } catch {}
-        }
+      synth.speak(currentUtterance);
+    }
 
-        for (let i = 0; i < 20; i++) {
-          if (ttsStart()) return;
-          await new Promise((r) => setTimeout(r, 100));
-        }
-        const pollInterval = setInterval(() => {
-          if (currentMode !== 'tts' || ttsStart()) clearInterval(pollInterval);
-        }, 100);
-        setTimeout(() => {
-          clearInterval(pollInterval);
-          if (currentMode === 'tts' && synth.getVoices().length === 0) {
-            refreshBtn.style.display = 'flex';
-            ttsStatus.textContent = "Voices still missing. Try 'Fix Voices'.";
-          }
-        }, 5000);
+    function ttsStart() {
+      const voices = synth.getVoices();
+      if (voices.length > 0 && ttsTextarea.value.trim()) {
+        startSpeaking();
+        return true;
+      }
+      return false;
+    }
+
+    // Nudge the TTS engine on load
+    (function wakeUp() {
+      const dummy = new SpeechSynthesisUtterance('');
+      dummy.volume = 0;
+      synth.speak(dummy);
+      synth.cancel();
+    })();
+
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = () => ttsStart();
+    }
+
+    /* ====================================
+       Idle + request loop
+       ==================================== */
+
+    function resetToIdle() {
+      currentMode = null;
+      synth.cancel();
+      if (isRecording) { try { toggleDictation(); } catch { } }
+      if (ttsIsRecording) { try { ttsToggleDictation(); } catch { } }
+
+      sttPanel.classList.remove('active-mode');
+      sttPanel.classList.add('inactive');
+      sttLabel.classList.remove('active');
+
+      ttsPanel.classList.remove('active-mode');
+      ttsPanel.classList.add('inactive');
+      ttsLabel.classList.remove('active');
+
+      // Reset button visibility
+      dictateBtn.style.opacity = '0.4';
+      dictateBtn.style.pointerEvents = 'none';
+      commandsBtn.style.opacity = '0.4';
+      commandsBtn.style.pointerEvents = 'none';
+      ttsDictateBtn.style.opacity = '0.4';
+      ttsDictateBtn.style.pointerEvents = 'none';
+      ttsCommandsBtn.style.opacity = '0.4';
+      ttsCommandsBtn.style.pointerEvents = 'none';
+
+      hasStarted = false;
+      ttsContainer.classList.remove('speaking');
+      ttsContainer.classList.remove('listening');
+      bars.forEach((b) => b.classList.remove('animating'));
+      playBtn.disabled = false;
+      stopBtn.disabled = true;
+      gotitBtn.disabled = true;
+      ttsStatus.textContent = 'Waiting...';
+      sttStatus.classList.remove('visible');
+
+      document.title = 'Waiting for next request...';
+    }
+
+    function activateStt(config) {
+      currentMode = 'stt';
+      sttPanel.classList.remove('inactive');
+      sttPanel.classList.add('active-mode');
+      sttLabel.classList.add('active');
+      ttsPanel.classList.add('inactive');
+      ttsPanel.classList.remove('active-mode');
+      ttsLabel.classList.remove('active');
+
+      // Enable STT buttons in active state
+      dictateBtn.style.opacity = '1';
+      dictateBtn.style.pointerEvents = 'auto';
+      commandsBtn.style.opacity = '1';
+      commandsBtn.style.pointerEvents = 'auto';
+
+      // Disable TTS buttons in inactive state
+      ttsDictateBtn.style.opacity = '0.4';
+      ttsDictateBtn.style.pointerEvents = 'none';
+      ttsCommandsBtn.style.opacity = '0.4';
+      ttsCommandsBtn.style.pointerEvents = 'none';
+
+      input.value = config.initialText || '';
+      if (config.initialText) processInput(false);
+      if (config.title) document.title = config.title;
+      sendBtn.textContent = config.action || 'Send';
+
+      if (!isRecording) {
+        try { toggleDictation(); } catch { }
+      }
+      input.focus();
+    }
+
+    async function activateTts(config) {
+      currentMode = 'tts';
+      ttsPanel.classList.remove('inactive');
+      ttsPanel.classList.add('active-mode');
+      ttsLabel.classList.add('active');
+      sttPanel.classList.add('inactive');
+      sttPanel.classList.remove('active-mode');
+      sttLabel.classList.remove('active');
+
+      // Enable TTS buttons in active state
+      ttsDictateBtn.style.opacity = '1';
+      ttsDictateBtn.style.pointerEvents = 'auto';
+      ttsCommandsBtn.style.opacity = '1';
+      ttsCommandsBtn.style.pointerEvents = 'auto';
+
+      // Disable STT buttons in inactive state
+      dictateBtn.style.opacity = '0.4';
+      dictateBtn.style.pointerEvents = 'none';
+      commandsBtn.style.opacity = '0.4';
+      commandsBtn.style.pointerEvents = 'none';
+
+      ttsTextarea.value = config.text || '';
+      if (config.text) {
+        addToHistory(HIST_RESPONSES, config.text);
+        responseHistory.refresh();
+        responseHistory.resetNav();
+      }
+      if (config.title) document.title = config.title;
+      isOneshot = !!config.oneshot;
+      userInteracted = false;
+      gotitBtn.disabled = false;
+      hasStarted = false;
+      playBtn.disabled = false;
+      stopBtn.disabled = true;
+
+      if (!ttsIsRecording) {
+        try { ttsToggleDictation(); } catch { }
       }
 
-      function connectSocket() {
-        resetToIdle();
-        const ws = new WebSocket(`ws://${location.host}/ws`);
-        socket = ws;
-        ws.onopen = () => sendSocket({ type: 'ready' });
-        ws.onmessage = (ev) => {
-          let msg;
-          try { msg = JSON.parse(ev.data); } catch { return; }
-          if (msg.type !== 'request' || !msg.config) return;
-          if (currentMode !== null) resetToIdle();
-          if (msg.config.mode === 'stt') activateStt(msg.config);
-          else if (msg.config.mode === 'tts') activateTts(msg.config);
-        };
-        ws.onclose = () => {
-          if (socket === ws) socket = null;
-          setTimeout(connectSocket, 500);
-        };
-        ws.onerror = () => { try { ws.close(); } catch {} };
+      for (let i = 0; i < 20; i++) {
+        if (ttsStart()) return;
+        await new Promise((r) => setTimeout(r, 100));
       }
+      const pollInterval = setInterval(() => {
+        if (currentMode !== 'tts' || ttsStart()) clearInterval(pollInterval);
+      }, 100);
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (currentMode === 'tts' && synth.getVoices().length === 0) {
+          refreshBtn.style.display = 'flex';
+          ttsStatus.textContent = "Voices still missing. Try 'Fix Voices'.";
+        }
+      }, 5000);
+    }
 
-      connectSocket();
-    </script>
-  </body>
+    function connectSocket() {
+      resetToIdle();
+      const ws = new WebSocket(`ws://${location.host}/ws`);
+      socket = ws;
+      ws.onopen = () => sendSocket({ type: 'ready' });
+      ws.onmessage = (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        if (msg.type !== 'request' || !msg.config) return;
+        if (currentMode !== null) resetToIdle();
+        if (msg.config.mode === 'stt') activateStt(msg.config);
+        else if (msg.config.mode === 'tts') activateTts(msg.config);
+      };
+      ws.onclose = () => {
+        if (socket === ws) socket = null;
+        setTimeout(connectSocket, 500);
+      };
+      ws.onerror = () => { try { ws.close(); } catch { } };
+    }
+
+    connectSocket();
+  </script>
+  <!-- fork additions (markkennethbadilla/cc-gc-stts): voice picker + optional auto-send on pause.
+       Kept as one separate script block that only reads the upstream page's top-level bindings,
+       so upstream changes merge without touching this and this can be deleted if upstream ships the same. -->
+  <script>
+    (function () {
+      const LS_VOICE = '__stts__voice';
+      const LS_AUTOSEND = '__stts__autosend';
+      const LS_AUTOSEND_MS = '__stts__autosend_ms';
+
+      /* ---- voice picker ---- */
+      const voiceSelect = document.createElement('select');
+      voiceSelect.id = 'voice-select';
+      voiceSelect.title = 'Voice used to read responses';
+      voiceSelect.style.cssText = 'max-width:14em;font-size:12px;';
+      refreshBtn.parentNode.insertBefore(voiceSelect, refreshBtn);
+
+      function fillVoices() {
+        const voices = synth.getVoices();
+        const saved = localStorage.getItem(LS_VOICE) || '';
+        voiceSelect.innerHTML = '<option value="">Default voice</option>' +
+          voices.map(v => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`).join('');
+      }
+      fillVoices();
+      synth.addEventListener('voiceschanged', fillVoices);
+      voiceSelect.onchange = () => localStorage.setItem(LS_VOICE, voiceSelect.value);
+
+      const origSpeak = SpeechSynthesis.prototype.speak;
+      SpeechSynthesis.prototype.speak = function (u) {
+        const name = localStorage.getItem(LS_VOICE);
+        const v = name && this.getVoices().find(x => x.name === name);
+        if (v && u.text) u.voice = v;
+        return origSpeak.call(this, u);
+      };
+
+      /* ---- auto-send after a pause (off by default) ---- */
+      const wrap = document.createElement('label');
+      wrap.title = 'Send the prompt automatically after this many seconds of silence';
+      wrap.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;';
+      wrap.innerHTML = '<input type="checkbox" id="autosend-on"> Auto-send after <input type="number" id="autosend-sec" min="0.5" step="0.5" style="width:3.5em"> s';
+      sendBtn.parentNode.insertBefore(wrap, sendBtn);
+      const autoOn = wrap.querySelector('#autosend-on');
+      const autoSec = wrap.querySelector('#autosend-sec');
+      autoOn.checked = localStorage.getItem(LS_AUTOSEND) === '1';
+      autoSec.value = (Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000) / 1000;
+      autoOn.onchange = () => localStorage.setItem(LS_AUTOSEND, autoOn.checked ? '1' : '0');
+      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(500, autoSec.valueAsNumber * 1000 || 2000)));
+
+      let pauseTimer = null;
+      input.addEventListener('input', () => {
+        clearTimeout(pauseTimer);
+        if (!autoOn.checked || currentMode !== 'stt' || !isRecording) return;
+        pauseTimer = setTimeout(() => {
+          if (autoOn.checked && currentMode === 'stt' && input.value.trim()) submit();
+        }, Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000);
+      });
+    })();
+  </script>
+</body>
+
 </html>
