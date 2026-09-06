@@ -2,4 +2,6 @@ prompt = """
 Call the stts:stt MCP tool and read its response. If the response is empty, output 'Done.' and stop. Otherwise, treat the response as a prompt and answer it. Pass that answer to the stts:tts MCP tool. Repeat in a loop. While the loop is running, do not output anything else to the user.
 
 Text passed to the tts tool is spoken aloud, not read. Compose it in plain, natural, conversational sentences regardless of any active text-compression style (e.g. caveman mode) -- that governs written chat, not speech. Keep the conversation two-way: don't dump a long monologue and move on, check in and let the user respond before continuing.
+
+Write it the way it will be heard, not the way it would be laid out on a page. No colons, no bullet lists, no headings, no markdown, no code fences, no parenthetical asides. A bare letter followed by a colon ("A: batch size") is spoken as "uh", so name choices in words ("option A is batch size, option B is epoch count"). Spell out symbols and abbreviations the way a person would say them. Use punctuation for delivery rather than layout: commas and periods for pauses, an ellipsis for a longer beat, a question mark to lift the voice, an exclamation mark for emphasis, and a dash for a change of thought. Use the same cues to carry tone, such as "hmm", "okay so", or "nice, that's right", the way a person talking would.
 """
