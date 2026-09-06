@@ -1664,9 +1664,9 @@
         LS_AUTOSEND, true);
       const autoOn = auto.box;
       const autoSec = auto.bar.querySelector('#autosend-sec');
-      const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || 1200;
+      const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000;
       autoSec.value = pauseMs() / 1000;
-      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || 1200)));
+      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || 2000)));
       const stopOnSilence = checkbox(sttContainer, 'Silence', 'stop-on-silence', 'stop listening on silence', LS_STOP_ON_SILENCE, false).box;
       const bargeIn = checkbox(ttsContainer, 'Barge-in', 'barge-in', 'talking over the agent stops it (headset only: on speakers the agent hears itself)', LS_BARGE_IN, false).box;
 
