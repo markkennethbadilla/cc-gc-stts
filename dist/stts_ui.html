@@ -1664,9 +1664,9 @@
         LS_AUTOSEND, true);
       const autoOn = auto.box;
       const autoSec = auto.bar.querySelector('#autosend-sec');
-      const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || 1200;
+      const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000;
       autoSec.value = pauseMs() / 1000;
-      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || 1200)));
+      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || 2000)));
       const stopOnSilence = checkbox(sttContainer, 'Silence', 'stop-on-silence', 'stop listening on silence', LS_STOP_ON_SILENCE, false).box;
       const bargeIn = checkbox(ttsContainer, 'Barge-in', 'barge-in', 'talking over the agent stops it (headset only: on speakers the agent hears itself)', LS_BARGE_IN, false).box;
 
@@ -1740,6 +1740,18 @@
         input.setSelectionRange(input.value.length, input.value.length);
         document.execCommand('insertText', false, sep + text);
       }
+      /* Upstream's own onresult writes with execCommand('insertText'), which goes to whatever is
+         focused; a click on empty page chrome moved focus off the textarea and the words vanished.
+         Two guards: a click on anything that is not itself a control never takes focus away, and a
+         final transcript puts the caret back at the end of the prompt before upstream inserts. */
+      document.addEventListener('mousedown', (e) => {
+        if (!e.target.closest('input, textarea, select, button, a, [contenteditable]')) e.preventDefault();
+      });
+      function keepCaret() {
+        if (document.activeElement === input) return;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
       function stripCommands(text) {
         return text.replace(new RegExp(TTS_COMMAND_REGEX.source, TTS_COMMAND_REGEX.flags), ' ').replace(/\s+/g, ' ').trim();
       }
@@ -1803,6 +1815,7 @@
           if (finalText) {
             const text = dedupe(finalText);
             pendingInterim = '';
+            keepCaret();
             if (text.trim()) upstreamOnResult.call(mic, { resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
           }
           if (interim) pendingInterim = interim.trim();
