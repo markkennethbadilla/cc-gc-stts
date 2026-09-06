@@ -1665,6 +1665,41 @@
           if (autoOn.checked && currentMode === 'stt' && input.value.trim()) submit();
         }, Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000);
       });
+
+      /* ---- keep listening through silence (on by default) ----
+         Chrome ends a SpeechRecognition on its own after a stretch of silence, even with
+         continuous = true. Restart it whenever it ends without the page having called stop(),
+         unless the user has asked it to stop on silence. Errors that mean the mic is unusable
+         are not retried. */
+      const LS_STOP_ON_SILENCE = '__stts__stop_on_silence';
+      const silenceBar = addBar(sttContainer, 'Silence',
+        '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-color);cursor:pointer">' +
+        '<input type="checkbox" id="stop-on-silence" style="margin:0"> stop listening on silence</label>');
+      const stopOnSilence = silenceBar.querySelector('#stop-on-silence');
+      stopOnSilence.checked = localStorage.getItem(LS_STOP_ON_SILENCE) === '1';
+      stopOnSilence.onchange = () => localStorage.setItem(LS_STOP_ON_SILENCE, stopOnSilence.checked ? '1' : '0');
+
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SR) {
+        const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture', 'aborted']);
+        const origStart = SR.prototype.start, origStop = SR.prototype.stop, origAbort = SR.prototype.abort;
+        // The page's recognizers already exist by the time this runs, so hook each instance
+        // lazily on its first start() instead of replacing the constructor.
+        SR.prototype.start = function () {
+          if (!this.__hooked) {
+            this.__hooked = true;
+            this.addEventListener('error', (e) => { if (FATAL.has(e.error)) this.__fatal = true; });
+            this.addEventListener('end', () => {
+              if (!this.__wanted || this.__fatal || stopOnSilence.checked || !currentMode) return;
+              setTimeout(() => { if (this.__wanted) { try { origStart.call(this); } catch { } } }, 250);
+            });
+          }
+          this.__wanted = true; this.__fatal = false;
+          return origStart.call(this);
+        };
+        SR.prototype.stop = function () { this.__wanted = false; return origStop.call(this); };
+        SR.prototype.abort = function () { this.__wanted = false; return origAbort.call(this); };
+      }
     })();
   </script>
 </body>
