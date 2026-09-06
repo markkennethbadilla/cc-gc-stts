@@ -1744,6 +1744,17 @@
          focused; a click on empty page chrome moved focus off the textarea and the words vanished.
          Two guards: a click on anything that is not itself a control never takes focus away, and a
          final transcript puts the caret back at the end of the prompt before upstream inserts. */
+      /* The inactive panel is greyed with pointer-events: none, so the agent's last answer cannot
+         be scrolled back or highlighted while Mark is the one talking. Give its textarea its
+         pointer events and full contrast back, and make it read-only for as long as it is
+         inactive, so a click there can select and scroll but never type over the text. */
+      document.head.appendChild(Object.assign(document.createElement('style'), {
+        textContent: '.panel.inactive>.container textarea{pointer-events:auto;opacity:1;filter:none;user-select:text}'
+      }));
+      const syncReadOnly = () => { ttsTextarea.readOnly = ttsPanel.classList.contains('inactive'); };
+      new MutationObserver(syncReadOnly).observe(ttsPanel, { attributes: true, attributeFilter: ['class'] });
+      syncReadOnly();
+
       document.addEventListener('mousedown', (e) => {
         if (!e.target.closest('input, textarea, select, button, a, [contenteditable]')) e.preventDefault();
       });
