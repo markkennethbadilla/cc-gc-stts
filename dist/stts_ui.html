@@ -1689,8 +1689,10 @@
           this.__hooked = true;
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
           this.addEventListener('error', (e) => { if (FATAL.has(e.error)) this.__fatal = true; });
+          this.addEventListener('start', () => ttsContainer.classList.add('listening'));
           this.addEventListener('end', () => {
-            if (!this.__wanted || this.__fatal || stopOnSilence.checked) return;
+            ttsContainer.classList.remove('listening');
+            if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             setTimeout(() => { if (this.__wanted) { try { origStart.call(this); } catch { } } }, 100);
           });
         }
@@ -1830,9 +1832,25 @@
         }
       }
 
+      /* ---- speakers: mic off while the agent talks, on the instant it stops ----
+         With barge-in off the mic must not hear the agent at all, so the recognizer is aborted
+         (abort drops buffered audio; stop would still deliver it) when an utterance starts and
+         started again the moment it ends, errors or is cancelled. The 'end' hook above sees
+         __paused and does not auto-restart in between. */
+      const muteMic = () => {
+        if (bargeIn.checked || !mic || !mic.__wanted || mic.__paused) return;
+        mic.__paused = true;
+        try { origAbort.call(mic); } catch { }
+      };
+      const unmuteMic = () => {
+        if (!mic || !mic.__paused) return;
+        mic.__paused = false;
+        if (mic.__wanted && !mic.__fatal) { try { origStart.call(mic); } catch { } }
+      };
       const origCancel = synth.cancel.bind(synth);
-      const noteEnd = () => { speakEndedAt = Date.now(); };
+      const noteEnd = () => { speakEndedAt = Date.now(); unmuteMic(); };
       SpeechSynthesis.prototype.speak = ((wrapped) => function (u) {
+        u.addEventListener('start', muteMic);
         u.addEventListener('end', noteEnd); u.addEventListener('error', noteEnd);
         return wrapped.call(this, u);
       })(SpeechSynthesis.prototype.speak);
