@@ -26,19 +26,28 @@ server.registerTool(
 server.registerTool(
   'tts',
   {
-    description: 'Send a string to the text-to-speech dialog to be spoken aloud.',
+    description:
+      'Send a string to the text-to-speech dialog to be spoken aloud. With listen=true it then opens speech-to-text at once and returns what the user said next, saving a round trip per turn.',
     inputSchema: {
       text: z.string().describe('The text to speak'),
+      listen: z.boolean().optional().describe('After speaking, listen and return the next transcript'),
     },
   },
-  async ({ text }) => {
+  async ({ text, listen }) => {
     await launchTts({
       title: 'Speak',
       action: 'Stop & Exit',
       text,
       oneshot: true,
     });
-    return { content: [{ type: 'text', text: 'Spoken.' }] };
+    if (!listen) return { content: [{ type: 'text', text: 'Spoken.' }] };
+    const heard = await launchStt({
+      title: 'Type or dictate',
+      action: 'Send',
+      initialText: '',
+      startRecording: false,
+    });
+    return { content: [{ type: 'text', text: heard }] };
   }
 );
 
