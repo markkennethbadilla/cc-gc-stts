@@ -1755,6 +1755,15 @@
       new MutationObserver(syncReadOnly).observe(ttsPanel, { attributes: true, attributeFilter: ['class'] });
       syncReadOnly();
 
+      /* Tab moved focus into the other panel's controls and opened pickers there, including while
+         that panel was inactive. This window has exactly one place typing belongs, so Tab never
+         navigates: it is swallowed and the caret stays in the prompt box. */
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        e.preventDefault();
+        keepCaret();
+      }, true);
+
       document.addEventListener('mousedown', (e) => {
         if (!e.target.closest('input, textarea, select, button, a, [contenteditable]')) e.preventDefault();
       });
