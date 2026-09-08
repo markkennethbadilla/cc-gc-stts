@@ -34,6 +34,23 @@ function loadHtml(): string {
   return fs.readFileSync(path.resolve(__dirname, 'stts_ui.html'), 'utf-8');
 }
 
+// Chrome is not installed everywhere; Edge is Chromium and speaks the same
+// flags, so fall back to it rather than crashing with ERR_LAUNCHER_NOT_INSTALLED.
+function resolveBrowserPath(): string | undefined {
+  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
+  try {
+    const found = ChromeLauncher.Launcher.getFirstInstallation();
+    if (found) return found;
+  } catch {}
+  const edges = [
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/usr/bin/microsoft-edge',
+  ];
+  return edges.find((p) => fs.existsSync(p));
+}
+
 function getChromeUserDataDir(): string {
   const dir = path.join(tmpdir(), 'cc-gc-stts-user-data-dir');
   mkdirSync(dir, { recursive: true });
@@ -60,6 +77,7 @@ async function ensureChrome() {
   chromeLaunching = (async () => {
     try {
       chrome = await ChromeLauncher.launch({
+        chromePath: resolveBrowserPath(),
         startingUrl: 'about:blank',
         userDataDir: getChromeUserDataDir(),
         ignoreDefaultFlags: true,
@@ -159,7 +177,16 @@ const server = http.createServer(async (req, res) => {
       }
     });
 
-    await ensureChrome();
+    try {
+      await ensureChrome();
+    } catch (e) {
+      // A browser that will not start is one failed request, not a dead daemon.
+      pending = null;
+      responded = true;
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `browser launch failed: ${(e as Error).message}` }));
+      return;
+    }
     deliverToPage();
     return;
   }
