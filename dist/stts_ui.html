@@ -1617,6 +1617,73 @@
       const LS_AUTOSEND_MS = '__stts__autosend_ms';
       const LS_STOP_ON_SILENCE = '__stts__stop_on_silence';
       const LS_BARGE_IN = '__stts__barge_in';
+      const LS_THEME = '__stts__theme';
+
+      /* ---- theme: system (default), light, dark ----
+         Upstream only has a prefers-color-scheme block, so light needs an explicit
+         override and dark needs one that wins without a media query. */
+      const themeStyle = document.createElement('style');
+      themeStyle.textContent = `
+        :root[data-theme="light"] {
+          --bg-color: #ffffff; --text-color: #202124; --accent-color: #1a73e8;
+          --border-color: #dadce0; --hover-color: #f1f3f4;
+          --shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+        }
+        :root[data-theme="dark"] {
+          --bg-color: #202124; --text-color: #e8eaed; --accent-color: #8ab4f8;
+          --border-color: #3c4043; --hover-color: #303134;
+          --shadow: 0 4px 6px rgba(0,0,0,.4);
+        }
+        :root[data-theme="dark"] .commands-panel { box-shadow: -2px 0 8px rgba(0,0,0,.4); }
+        #theme-btn {
+          position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+          display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+          border: 1px solid var(--border-color); border-radius: 8px;
+          background: var(--bg-color); color: var(--text-color); font-size: 12px;
+          cursor: pointer; transition: transform .08s ease, background .15s ease;
+        }
+        #theme-btn:hover { background: var(--hover-color); }
+        #theme-btn:active { transform: translateY(-50%) scale(.92); }
+        #theme-btn.bump svg { animation: theme-pop .28s ease; }
+        @keyframes theme-pop {
+          0% { transform: scale(.6) rotate(-30deg); opacity: .3; }
+          100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+      `;
+      document.head.appendChild(themeStyle);
+
+      const THEMES = ['system', 'light', 'dark'];
+      const THEME_ICON = {
+        // monitor, sun, moon
+        system: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 3H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7v2H7v2h10v-2h-3v-2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 12H3V5h18v10z"/></svg>',
+        light: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5v3m0 14v3M2 12h3m14 0h3M4.2 4.2l2.1 2.1m11.4 11.4 2.1 2.1M19.8 4.2l-2.1 2.1M6.3 17.7l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="12" cy="12" r="4"/></svg>',
+        dark: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+      };
+      const themeBtn = document.createElement('button');
+      themeBtn.id = 'theme-btn';
+      themeBtn.tabIndex = -1;
+      let theme = localStorage.getItem(LS_THEME);
+      if (!THEMES.includes(theme)) theme = 'system';
+      function paintTheme(bump) {
+        if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+        else document.documentElement.setAttribute('data-theme', theme);
+        themeBtn.innerHTML = THEME_ICON[theme] + '<span>' + theme[0].toUpperCase() + theme.slice(1) + '</span>';
+        themeBtn.title = 'Theme: ' + theme + ' (click to change)';
+        if (bump) {
+          themeBtn.classList.remove('bump');
+          void themeBtn.offsetWidth;
+          themeBtn.classList.add('bump');
+        }
+      }
+      themeBtn.onclick = () => {
+        theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+        localStorage.setItem(LS_THEME, theme);
+        paintTheme(true);
+      };
+      paintTheme(false);
+      const endBar = document.querySelector('.end-bar');
+      endBar.style.position = 'relative';
+      endBar.appendChild(themeBtn);
 
       function addBar(container, label, innerHtml) {
         const bar = document.createElement('div');
