@@ -31,14 +31,16 @@ server.registerTool(
     inputSchema: {
       text: z.string().describe('The text to speak'),
       listen: z.boolean().optional().describe('After speaking, listen and return the next transcript'),
+      close: z.boolean().optional().describe('Close the voice window after speaking. Use on the last message of a conversation, never with listen.'),
     },
   },
-  async ({ text, listen }) => {
+  async ({ text, listen, close }) => {
     await launchTts({
       title: 'Speak',
       action: 'Stop & Exit',
       text,
       oneshot: true,
+      close: !!close && !listen,
     });
     if (!listen) return { content: [{ type: 'text', text: 'Spoken.' }] };
     const heard = await launchStt({

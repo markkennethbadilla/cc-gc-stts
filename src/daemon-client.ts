@@ -21,6 +21,7 @@ export interface TtsConfig {
   action: string;
   text: string;
   oneshot: boolean;
+  close?: boolean;
 }
 
 type PingResult = 'ours' | 'foreign' | 'closed';

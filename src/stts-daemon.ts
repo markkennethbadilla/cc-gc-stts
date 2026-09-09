@@ -18,6 +18,7 @@ type RequestConfig = {
   startRecording?: boolean;
   text?: string;
   oneshot?: boolean;
+  close?: boolean;       // spec 004: close the window once this request is answered
 };
 
 type Pending = {
@@ -131,6 +132,12 @@ async function ensureChrome() {
           '--window-size=1600,600',
           '--autoplay-policy=no-user-gesture-required',
           '--auto-accept-camera-and-microphone-capture',
+          // Spec 002. The window is usually behind the terminal, and Chromium
+          // throttles a hidden page's timers (to once a minute after a while),
+          // which delayed the barge-in pause by tens of seconds (2026-09-09).
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
         ],
       });
       if (chrome?.port) {
@@ -168,11 +175,20 @@ function deliverToPage() {
 const barge: string[] = [];
 let raiseOnRequest = false;
 
+// Spec 004. The window closes when the conversation is over: the last tts of a
+// voice loop asks for it with close (End conversation in the page shuts the
+// daemon itself). The daemon stays up so the next call is fast.
+function closeWindow() {
+  try { if (chrome) chrome.kill(); } catch {}
+  chrome = null;
+}
+
 function resolvePending(text: string) {
   if (!pending) return;
   const p = pending;
   pending = null;
   p.respond(text);
+  if (p.config.close) setTimeout(closeWindow, 200);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -282,7 +298,7 @@ wss.on('connection', (socket) => {
         return;
       }
       case 'cancel':
-      case 'close':
+      case 'close':   // 'close' is also the page's normal end of a tts turn; it never closes the window
         resolvePending('');
         return;
       case 'barge':

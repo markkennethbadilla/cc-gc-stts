@@ -2064,18 +2064,35 @@
         // daemon as a barge-in (spec 002), so the hook delivers them at the next tool call.
         // If nothing fetches them, the daemon prepends them to the next stt answer.
         if (finalText) {
+          clearInterim();
           const kept = stripCommands(dedupe(finalText));
-          if (kept) carry = [carry, kept].filter(Boolean).join(' ');
+          if (kept) { carry = [carry, kept].filter(Boolean).join(' '); insert(kept); }
         }
+        if (interim) showInterim(interim.trim());
         if (carry) {
           clearTimeout(bargeTimer);
           bargeTimer = setTimeout(() => {
             if (currentMode !== null || !carry) return;
             sendSocket({ type: 'barge', text: carry });
-            carry = '';
+            carry = ''; prov = null; input.value = '';
+            sttStatus.textContent = 'Sent to the agent. Listening...';
           }, pauseMs());
         }
       }
+
+      /* Spec 004: while the agent works (idle), the Talk panel looks live and transcribes,
+         because the mic is live. Upstream greys both panels; only the Listen panel stays grey. */
+      const origResetToIdle = resetToIdle;
+      resetToIdle = function () {
+        origResetToIdle();
+        sttPanel.classList.remove('inactive');
+        sttLabel.classList.add('active');
+        dictateBtn.style.opacity = '1'; dictateBtn.style.pointerEvents = 'auto';
+        commandsBtn.style.opacity = '1'; commandsBtn.style.pointerEvents = 'auto';
+        sttStatus.textContent = 'Agent working. Listening...';
+        sttStatus.classList.add('visible');
+        input.placeholder = 'Say something; it reaches the agent after your pause';
+      };
       let bargeTimer = null;
 
       /* ---- speakers: mic off while the agent talks, on the instant it stops ----
