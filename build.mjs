@@ -22,8 +22,6 @@ await build({
   logLevel: 'info',
 });
 
-for (const file of ['stts_ui.html', 'manifest.json', 'sw.js', 'icon.svg', 'icon.png', 'icon.ico']) {
-  copyFileSync(path.join('src', file), path.join(outdir, file));
-}
+copyFileSync(path.join('src', 'stts_ui.html'), path.join(outdir, 'stts_ui.html'));
 
 console.log('Build complete: dist/stts.mjs, dist/stts-mcp-server.mjs, dist/stts-daemon.mjs');
