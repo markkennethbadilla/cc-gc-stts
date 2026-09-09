@@ -57,6 +57,29 @@ function getChromeUserDataDir(): string {
   return dir;
 }
 
+function bringWindowToFront(port: number): void {
+  if (!port) return;
+  const req = http.get(`http://127.0.0.1:${port}/json`, (res) => {
+    let data = '';
+    res.on('data', (chunk) => { data += chunk; });
+    res.on('end', () => {
+      try {
+        const targets = JSON.parse(data);
+        const page = targets.find((t: any) => t.type === 'page' && t.webSocketDebuggerUrl);
+        if (page?.webSocketDebuggerUrl) {
+          const ws = new WebSocket(page.webSocketDebuggerUrl);
+          ws.once('open', () => {
+            ws.send(JSON.stringify({ id: 1, method: 'Page.bringToFront' }));
+            setTimeout(() => { try { ws.close(); } catch {} }, 500);
+          });
+          ws.once('error', () => {});
+        }
+      } catch {}
+    });
+  });
+  req.on('error', () => {});
+}
+
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -72,14 +95,21 @@ function shutdown() {
 }
 
 async function ensureChrome() {
-  if (chrome) return;
+  if (chrome) {
+    if (chrome.process && !chrome.process.killed) {
+      if (chrome.port) bringWindowToFront(chrome.port);
+      return;
+    }
+    chrome = null;
+  }
   if (chromeLaunching) return chromeLaunching;
   chromeLaunching = (async () => {
     try {
+      const userDataDir = getChromeUserDataDir();
       chrome = await ChromeLauncher.launch({
         chromePath: resolveBrowserPath(),
         startingUrl: 'about:blank',
-        userDataDir: getChromeUserDataDir(),
+        userDataDir,
         ignoreDefaultFlags: true,
         chromeFlags: [
           '--no-first-run',
@@ -91,6 +121,9 @@ async function ensureChrome() {
           '--auto-accept-camera-and-microphone-capture',
         ],
       });
+      if (chrome?.port) {
+        bringWindowToFront(chrome.port);
+      }
       chrome.process.on('exit', () => {
         chrome = null;
         if (pageSocket) {
