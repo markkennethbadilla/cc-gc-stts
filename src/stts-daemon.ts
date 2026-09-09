@@ -131,6 +131,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/manifest.json') {
+    res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8' });
+    res.end(fs.readFileSync(path.resolve(__dirname, 'manifest.json'), 'utf-8'));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/sw.js') {
+    res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+    res.end(fs.readFileSync(path.resolve(__dirname, 'sw.js'), 'utf-8'));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/icon.svg') {
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+    res.end(fs.readFileSync(path.resolve(__dirname, 'icon.svg'), 'utf-8'));
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/ping') {
     res.writeHead(200);
     res.end('ok');
