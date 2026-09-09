@@ -109,7 +109,7 @@ function shutdown() {
 async function ensureChrome() {
   if (chrome) {
     if (chrome.process && !chrome.process.killed) {
-      if (chrome.port) bringWindowToFront(chrome.port);
+      if (chrome.port && raiseOnRequest) bringWindowToFront(chrome.port);
       return;
     }
     chrome = null;
@@ -160,6 +160,14 @@ function deliverToPage() {
   pageSocket.send(JSON.stringify({ type: 'request', config: pending.config }));
 }
 
+// Spec 002. Speech heard while no request is pending, reported by the page
+// after Mark's pause. A house hook fetches it before every tool call, so it
+// reaches the working agent as an addition, not a stop. Spec 003. Whether a
+// request raises the window; the page sends its settings on connect and on
+// change.
+const barge: string[] = [];
+let raiseOnRequest = false;
+
 function resolvePending(text: string) {
   if (!pending) return;
   const p = pending;
@@ -179,6 +187,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/ping') {
     res.writeHead(200);
     res.end('ok');
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/barge') {
+    const text = barge.splice(0).join(' ');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ text }));
     return;
   }
 
@@ -259,12 +274,22 @@ wss.on('connection', (socket) => {
       case 'ready':
         deliverToPage();
         return;
-      case 'complete':
-        resolvePending(typeof msg.text === 'string' ? msg.text : '');
+      case 'complete': {
+        let text = typeof msg.text === 'string' ? msg.text : '';
+        // Barge-ins nobody fetched during the turn still reach the agent.
+        if (pending?.config.mode === 'stt' && barge.length) text = [barge.splice(0).join(' '), text].filter(Boolean).join(' ');
+        resolvePending(text);
         return;
+      }
       case 'cancel':
       case 'close':
         resolvePending('');
+        return;
+      case 'barge':
+        if (typeof msg.text === 'string' && msg.text.trim()) barge.push(msg.text.trim());
+        return;
+      case 'settings':
+        raiseOnRequest = !!(msg as { raise?: boolean }).raise;
         return;
     }
   });
