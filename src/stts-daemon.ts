@@ -149,6 +149,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/icon.png') {
+    res.writeHead(200, { 'Content-Type': 'image/png' });
+    res.end(fs.readFileSync(path.resolve(__dirname, 'icon.png')));
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/icon.ico') {
+    res.writeHead(200, { 'Content-Type': 'image/x-icon' });
+    res.end(fs.readFileSync(path.resolve(__dirname, 'icon.ico')));
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/ping') {
     res.writeHead(200);
     res.end('ok');

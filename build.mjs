@@ -22,7 +22,7 @@ await build({
   logLevel: 'info',
 });
 
-for (const file of ['stts_ui.html', 'manifest.json', 'sw.js', 'icon.svg']) {
+for (const file of ['stts_ui.html', 'manifest.json', 'sw.js', 'icon.svg', 'icon.png', 'icon.ico']) {
   copyFileSync(path.join('src', file), path.join(outdir, file));
 }
 
