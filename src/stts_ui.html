@@ -1601,8 +1601,19 @@
         if (msg.config.mode === 'stt') activateStt(msg.config);
         else if (msg.config.mode === 'tts') activateTts(msg.config);
       };
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
         if (socket === ws) socket = null;
+        if (ev && ev.code === 4000) {
+          document.title = 'STTS (active in another window)';
+          const onTakeover = () => {
+            window.removeEventListener('focus', onTakeover);
+            window.removeEventListener('click', onTakeover);
+            connectSocket();
+          };
+          window.addEventListener('focus', onTakeover);
+          window.addEventListener('click', onTakeover);
+          return;
+        }
         setTimeout(connectSocket, 500);
       };
       ws.onerror = () => { try { ws.close(); } catch { } };
