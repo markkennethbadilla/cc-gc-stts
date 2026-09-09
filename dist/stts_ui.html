@@ -1630,6 +1630,9 @@
       const LS_BARGE_IN = '__stts__barge_in';
       const LS_THEME = '__stts__theme';
       const LS_RATE = '__stts__rate';
+      // The reverted PWA build left a service worker registered in the profile; it would keep
+      // serving the page it cached over any newer build. Drop it.
+      if (navigator.serviceWorker) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
 
       /* ---- theme: system (default), light, dark ----
          Upstream only has a prefers-color-scheme block, so light needs an explicit
@@ -1860,6 +1863,7 @@
       // activateStt is the one place a start is wanted; mic runs from then on.
       const origActivateStt = activateStt;
       activateStt = function (config) {
+        prov = null; pendingInterim = '';
         origActivateStt(config);
         if (carry) { insert(carry); carry = ''; armPause(); }
       };
@@ -1947,10 +1951,35 @@
       }
       // Send interim text now instead of waiting for Chrome to finalise it, which for a lone
       // short word can take until the next thing is said. The later final is deduped.
+      /* ---- live interim text ----
+         Edge finalises an utterance late: often only when the next one starts, or after a long
+         pause. With finals alone the box stays empty while Mark talks, then fills after the
+         pause, and a short second utterance looks dropped until a third pause lands it (Mark
+         2026-09-09: "clunky"). So the latest interim is written into the box as a provisional
+         tail that is replaced on every update and swapped for the final when it arrives. */
+      let prov = null;            // { start } of the provisional tail in the prompt box
+      function showInterim(t) {
+        const v = input.value;
+        const start = prov ? prov.start : v.length;
+        const sep = start > 0 && !/\s$/.test(v.slice(0, start)) ? ' ' : '';
+        input.focus();
+        input.setSelectionRange(start, v.length);
+        document.execCommand('insertText', false, sep + t);
+        prov = { start };
+      }
+      function clearInterim() {
+        if (!prov) return;
+        if (prov.start < input.value.length) {
+          input.setSelectionRange(prov.start, input.value.length);
+          document.execCommand('delete', false);
+        }
+        prov = null;
+      }
       function flushInterim() {
         if (!pendingInterim) return;
         const full = pendingInterim;
-        insert(dedupe(full));
+        if (prov) prov = null;      // already on screen: keep it as typed
+        else insert(dedupe(full));
         flushed = full; flushedAt = Date.now(); pendingInterim = '';
       }
       function flushAndSend() {
@@ -1980,12 +2009,15 @@
         }
         if (currentMode === 'stt') {
           if (finalText) {
+            clearInterim();
             const text = dedupe(finalText);
             pendingInterim = '';
             keepCaret();
-            if (text.trim()) upstreamOnResult.call(mic, { resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
+            // Successive finals arrived glued ("AWS.I don't know"): give each its own space.
+            const sep = input.value && !/\s$/.test(input.value) && !/^\s/.test(text) ? ' ' : '';
+            if (text.trim()) upstreamOnResult.call(mic, { resultIndex: 0, results: [Object.assign([{ transcript: sep + text }], { isFinal: true })] });
           }
-          if (interim) pendingInterim = interim.trim();
+          if (interim) { pendingInterim = interim.trim(); showInterim(pendingInterim); }
           armPause();
           return;
         }
