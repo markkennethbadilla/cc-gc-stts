@@ -51,8 +51,20 @@ function resolveBrowserPath(): string | undefined {
   return edges.find((p) => fs.existsSync(p));
 }
 
+// The page keeps every setting (voice, rate, auto-send, theme) in this profile's
+// localStorage, so the profile lives under the user's app-data, not %TEMP%,
+// where disk cleanup would silently reset all of it. One-time move of the old
+// %TEMP% profile so nothing already chosen is lost.
 function getChromeUserDataDir(): string {
-  const dir = path.join(tmpdir(), 'cc-gc-stts-user-data-dir');
+  const base = process.platform === 'win32'
+    ? (process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || tmpdir(), 'AppData', 'Local'))
+    : path.join(process.env.HOME || tmpdir(), '.local', 'share');
+  const dir = path.join(base, 'cc-gc-stts', 'profile');
+  const old = path.join(tmpdir(), 'cc-gc-stts-user-data-dir');
+  if (!fs.existsSync(dir) && fs.existsSync(old)) {
+    mkdirSync(path.dirname(dir), { recursive: true });
+    try { fs.renameSync(old, dir); } catch {}
+  }
   mkdirSync(dir, { recursive: true });
   return dir;
 }

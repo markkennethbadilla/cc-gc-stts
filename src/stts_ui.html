@@ -1629,6 +1629,7 @@
       const LS_STOP_ON_SILENCE = '__stts__stop_on_silence';
       const LS_BARGE_IN = '__stts__barge_in';
       const LS_THEME = '__stts__theme';
+      const LS_RATE = '__stts__rate';
 
       /* ---- theme: system (default), light, dark ----
          Upstream only has a prefers-color-scheme block, so light needs an explicit
@@ -1696,12 +1697,65 @@
       endBar.style.position = 'relative';
       endBar.appendChild(themeBtn);
 
+      /* ---- settings popover ----
+         Every fork setting lives behind one gear button at the left of the end bar, mirroring the
+         theme button at the right, so the panels keep their full height for text. The popover is
+         a column of the same history-bar rows the settings used to occupy at the top of each
+         panel; nothing about the rows changed, only where they sit. */
+      document.head.appendChild(Object.assign(document.createElement('style'), {
+        textContent: `
+        #settings-btn {
+          position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+          display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+          border: 1px solid var(--border-color); border-radius: 8px;
+          background: var(--bg-color); color: var(--text-color); font-size: 12px;
+          cursor: pointer; transition: transform .08s ease, background .15s ease;
+        }
+        #settings-btn:hover { background: var(--hover-color); }
+        #settings-btn:active { transform: translateY(-50%) scale(.92); }
+        #settings-btn svg { transition: transform .25s ease; }
+        #settings-btn.open svg { transform: rotate(60deg); }
+        #settings-pop {
+          position: absolute; left: 14px; bottom: calc(100% + 8px); z-index: 50;
+          width: min(520px, calc(100vw - 28px)); display: none; flex-direction: column;
+          border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
+          background: var(--bg-color); box-shadow: var(--shadow);
+        }
+        #settings-pop.open { display: flex; }
+        #settings-pop .history-bar:last-child { border-bottom: none; }
+        #settings-pop .history-label { min-width: 68px; }
+        #settings-pop input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent-color); }
+        #settings-pop .range-val { font-size: 12px; min-width: 3em; text-align: right; color: var(--text-color); }
+      `}));
+      const settingsPop = document.createElement('div');
+      settingsPop.id = 'settings-pop';
+      const settingsBtn = document.createElement('button');
+      settingsBtn.id = 'settings-btn';
+      settingsBtn.tabIndex = -1;
+      settingsBtn.title = 'Settings: voice, rate, auto-send, silence, barge-in';
+      settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span>Settings</span>';
+      settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        const open = !settingsPop.classList.contains('open');
+        settingsPop.classList.toggle('open', open);
+        settingsBtn.classList.toggle('open', open);
+      };
+      document.addEventListener('mousedown', (e) => {
+        if (settingsPop.classList.contains('open') && !e.target.closest('#settings-pop, #settings-btn')) {
+          settingsPop.classList.remove('open');
+          settingsBtn.classList.remove('open');
+        }
+      });
+      endBar.appendChild(settingsBtn);
+      endBar.appendChild(settingsPop);
+
+      // The container argument is kept so the rows read the same as before; every row now
+      // goes into the popover.
       function addBar(container, label, innerHtml) {
         const bar = document.createElement('div');
         bar.className = 'history-bar';
         bar.innerHTML = `<span class="history-label">${label}</span>${innerHtml}`;
-        const history = container.querySelector('.history-bar');
-        history.parentNode.insertBefore(bar, history.nextSibling);
+        settingsPop.appendChild(bar);
         return bar;
       }
       function checkbox(container, label, id, text, key, defaultOn) {
@@ -1728,11 +1782,26 @@
       fillVoices();
       synth.addEventListener('voiceschanged', fillVoices);
       voiceSelect.onchange = () => localStorage.setItem(LS_VOICE, voiceSelect.value);
+
+      /* ---- speaking rate, 0.5x to 2x ---- */
+      const rateBar = addBar(ttsContainer, 'Rate',
+        '<input type="range" id="rate-range" min="0.5" max="2" step="0.1" title="Speaking rate"><span class="range-val" id="rate-val"></span>');
+      const rateRange = rateBar.querySelector('#rate-range');
+      const rateVal = rateBar.querySelector('#rate-val');
+      const rate = () => Math.min(2, Math.max(0.5, Number(localStorage.getItem(LS_RATE)) || 1));
+      rateRange.value = rate();
+      rateVal.textContent = rate().toFixed(1) + 'x';
+      rateRange.oninput = () => {
+        localStorage.setItem(LS_RATE, String(rateRange.valueAsNumber));
+        rateVal.textContent = rateRange.valueAsNumber.toFixed(1) + 'x';
+      };
+
       const origSpeak = SpeechSynthesis.prototype.speak;
       SpeechSynthesis.prototype.speak = function (u) {
         const name = localStorage.getItem(LS_VOICE);
         const v = name && this.getVoices().find(x => x.name === name);
         if (v && u.text) u.voice = v;
+        if (u.text) u.rate = rate();
         return origSpeak.call(this, u);
       };
 
