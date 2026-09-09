@@ -6,14 +6,5 @@
     "name": "Sandip Chitale"
   },
   "repository": "https://github.com/sandipchitale/cc-gc-stts",
-  "license": "MIT",
-  "mcpServers": {
-    "stts": {
-      "command": "node",
-      "args": [
-        "${AGY_PLUGIN_ROOT}/dist/stts-mcp-server.mjs"
-      ],
-      "cwd": "${AGY_PLUGIN_ROOT}"
-    }
-  }
+  "license": "MIT"
 }
