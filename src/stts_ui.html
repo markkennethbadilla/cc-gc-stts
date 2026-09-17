@@ -1860,6 +1860,7 @@
          can instead wedge: no results, no 'end', nothing to restart from, and the window still
          says Listening while nothing is heard (Mark 2026-09-17). Anything over 90 s with no event
          is that wedge, so force a cycle. Costs nothing while the mic is healthy. */
+      let micSpeaking = false;    // true between the recognizer's speechstart and speechend
       let lastMicEvent = Date.now();
       function micAlive() { lastMicEvent = Date.now(); }
       setInterval(() => {
@@ -1881,6 +1882,12 @@
           this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); });
           this.addEventListener('result', micAlive);
           this.addEventListener('soundstart', micAlive);
+          /* Auto-send used to count from the last word the recognizer wrote down, so a thinking
+             pause mid-sentence looked like the end of the turn and the prompt went early, cutting
+             Mark off (2026-09-17, still at 4 s). The recognizer knows when speech itself starts
+             and stops, so use that: no timer may run while he is audibly talking. */
+          this.addEventListener('speechstart', () => { micSpeaking = true; micAlive(); clearTimeout(pauseTimer); clearTimeout(bargeTimer); });
+          this.addEventListener('speechend', () => { micSpeaking = false; micAlive(); armPause(); armBarge(); });
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
@@ -2052,6 +2059,7 @@
       }
       function armPause() {
         clearTimeout(pauseTimer);
+        if (micSpeaking) return;   // still talking: the speechend handler arms it
         if (currentMode === 'stt' && autoOn.checked && (input.value.trim() || pendingInterim)) {
           pauseTimer = setTimeout(flushAndSend, pauseMs());
         }
@@ -2110,7 +2118,10 @@
           if (kept) { carry = [carry, kept].filter(Boolean).join(' '); insert(kept); }
         }
         if (interim) showInterim(interim.trim());
-        if (carry) {
+        armBarge();
+      }
+      function armBarge() {
+        if (carry && !micSpeaking) {
           clearTimeout(bargeTimer);
           bargeTimer = setTimeout(() => {
             if (currentMode !== null || !carry) return;

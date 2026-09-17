@@ -54,6 +54,19 @@ time while it is still speaking. A short human reply, "yeah", "no, the other
 one", is therefore never swallowed, and a real answer that happens to reuse
 some of the agent's words is kept.
 
+### Auto-send waits for him to stop talking
+
+Auto-send counted from the last word the recognizer wrote down. Edge writes
+words in bursts, so a thinking pause mid-sentence looked like the end of the
+turn and the prompt was sent while Mark was still speaking, even with the
+delay raised to four seconds.
+
+The recognizer reports `speechstart` and `speechend`, which track sound, not
+transcription. The send timer is now cleared on `speechstart` and only armed
+on `speechend`, and `armPause` refuses to arm while speech is in progress. The
+barge-in timer, which hands speech to the agent mid-turn, follows the same
+rule.
+
 ## What it reads and writes
 
 Reads only the recognizer's own events and the existing mute, pause and
