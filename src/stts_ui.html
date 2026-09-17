@@ -1853,6 +1853,23 @@
          one. The panel code's own start/stop calls are suppressed except from the mic button, Ctrl+R
          and End conversation. */
       const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
+
+      /* ---- watchdog ----
+         Edge ends a recognition session every minute or so and the 'end' hook restarts it, so a
+         healthy mic shows some event every minute even in silence. After a long quiet stretch it
+         can instead wedge: no results, no 'end', nothing to restart from, and the window still
+         says Listening while nothing is heard (Mark 2026-09-17). Anything over 90 s with no event
+         is that wedge, so force a cycle. Costs nothing while the mic is healthy. */
+      let lastMicEvent = Date.now();
+      function micAlive() { lastMicEvent = Date.now(); }
+      setInterval(() => {
+        if (!mic || !mic.__wanted || mic.__paused || muted || stopOnSilence.checked) return;
+        if (Date.now() - lastMicEvent < 90000) return;
+        micAlive();
+        mic.__fatal = false;
+        try { origAbort.call(mic); } catch { }
+        setTimeout(() => { if (mic.__wanted && !mic.__paused) { try { origStart.call(mic); } catch { } } }, 300);
+      }, 15000);
       const origStart = SR.prototype.start, origStop = SR.prototype.stop, origAbort = SR.prototype.abort;
       let mic = null;             // the STT panel's recognizer, captured on its first start()
       let upstreamOnResult = null;
@@ -1861,11 +1878,20 @@
           this.__hooked = true;
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
           this.addEventListener('error', (e) => { if (FATAL.has(e.error)) this.__fatal = true; });
-          this.addEventListener('start', () => ttsContainer.classList.add('listening'));
+          this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); });
+          this.addEventListener('result', micAlive);
+          this.addEventListener('soundstart', micAlive);
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
+            micAlive();
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
-            setTimeout(() => { if (this.__wanted) { try { origStart.call(this); } catch { } } }, 100);
+            // A start() that threw used to be swallowed and never retried, leaving the mic dead
+            // for the rest of the session. Retry with a widening delay.
+            const retry = (delay) => setTimeout(() => {
+              if (!this.__wanted || this.__fatal || this.__paused) return;
+              try { origStart.call(this); } catch { if (delay < 5000) retry(delay * 2); }
+            }, delay);
+            retry(100);
           });
         }
         this.__wanted = true; this.__fatal = false;
