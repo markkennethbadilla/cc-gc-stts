@@ -1860,7 +1860,13 @@
          can instead wedge: no results, no 'end', nothing to restart from, and the window still
          says Listening while nothing is heard (Mark 2026-09-17). Anything over 90 s with no event
          is that wedge, so force a cycle. Costs nothing while the mic is healthy. */
-      let micSpeaking = false;    // true between the recognizer's speechstart and speechend
+      /* Edge fires speechstart reliably and speechend hardly ever, so "is he still talking" is
+         speechstart plus a transcript still arriving. Words stop arriving the moment he goes
+         quiet, so the countdown starts from the last word, as it did before, and is only held
+         back while sound is genuinely still being transcribed. */
+      let speechStartedAt = 0;
+      let lastResultAt = 0;
+      const micSpeaking = () => speechStartedAt > 0 && Date.now() - lastResultAt < 1200;
       let lastMicEvent = Date.now();
       function micAlive() { lastMicEvent = Date.now(); }
       setInterval(() => {
@@ -1880,14 +1886,14 @@
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
           this.addEventListener('error', (e) => { if (FATAL.has(e.error)) this.__fatal = true; });
           this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); });
-          this.addEventListener('result', micAlive);
+          this.addEventListener('result', () => { micAlive(); lastResultAt = Date.now(); });
           this.addEventListener('soundstart', micAlive);
           /* Auto-send used to count from the last word the recognizer wrote down, so a thinking
              pause mid-sentence looked like the end of the turn and the prompt went early, cutting
              Mark off (2026-09-17, still at 4 s). The recognizer knows when speech itself starts
              and stops, so use that: no timer may run while he is audibly talking. */
-          this.addEventListener('speechstart', () => { micSpeaking = true; micAlive(); clearTimeout(pauseTimer); clearTimeout(bargeTimer); });
-          this.addEventListener('speechend', () => { micSpeaking = false; micAlive(); armPause(); armBarge(); });
+          this.addEventListener('speechstart', () => { speechStartedAt = Date.now(); micAlive(); clearTimeout(pauseTimer); clearTimeout(bargeTimer); });
+          this.addEventListener('speechend', () => { speechStartedAt = 0; micAlive(); armPause(); armBarge(); });
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
@@ -2059,7 +2065,7 @@
       }
       function armPause() {
         clearTimeout(pauseTimer);
-        if (micSpeaking) return;   // still talking: the speechend handler arms it
+        if (micSpeaking()) { pauseTimer = setTimeout(armPause, 400); return; }   // still talking
         if (currentMode === 'stt' && autoOn.checked && (input.value.trim() || pendingInterim)) {
           pauseTimer = setTimeout(flushAndSend, pauseMs());
         }
@@ -2121,7 +2127,7 @@
         armBarge();
       }
       function armBarge() {
-        if (carry && !micSpeaking) {
+        if (carry && !micSpeaking()) {
           clearTimeout(bargeTimer);
           bargeTimer = setTimeout(() => {
             if (currentMode !== null || !carry) return;
