@@ -1,4 +1,4 @@
-# 005 - The microphone stays alive
+# 005 - The microphone stays alive, and stops hearing itself
 
 ## What it does
 
@@ -38,6 +38,22 @@ and so on up to 5 seconds, instead of giving up on the first throw.
 The watchdog does nothing when "stop listening on silence" is switched on,
 because stopping is what the user asked for there.
 
+### The agent's own voice coming back
+
+The Talk panel had no echo test at all. After the agent speaks with listening
+switched on, the window is in Talk mode, so a transcript of the agent's own
+voice arriving late went straight into the prompt box and was sent back as if
+Mark had said it. It happened twice in a row on 2026-09-17.
+
+The existing echo test only covers the Listen panel and only for 1.5 seconds
+after speech ends, which is earlier than the late transcript arrives. So the
+Talk panel gets a stricter, longer-lived test: text is dropped only when it
+runs to at least four content words and at most a quarter of them are absent
+from what was just spoken, within 20 seconds of the agent finishing or at any
+time while it is still speaking. A short human reply, "yeah", "no, the other
+one", is therefore never swallowed, and a real answer that happens to reuse
+some of the agent's words is kept.
+
 ## What it reads and writes
 
 Reads only the recognizer's own events and the existing mute, pause and
@@ -46,6 +62,9 @@ silence settings. Writes nothing to disk and sends nothing to the daemon.
 ## How to run, check, and hand over
 
 Build with `npm run build`, which bundles `src/stts_ui.html` into `dist/`.
+
+`node --test test/echo.test.mjs` lifts the echo functions out of
+`src/stts_ui.html` and checks them, so it fails if the page's version drifts.
 
 To check: open the voice window, leave it silent for three minutes, then
 speak. The words appear and auto-send fires. In the console,

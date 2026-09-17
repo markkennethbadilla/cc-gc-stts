@@ -1981,6 +1981,20 @@
       // content words is not enough evidence either way, so it waits for more.
       const STOP = new Set('a an the i you it to of and or is are was be do so that this in on at for with me my your we they he she not no yes ok okay um uh'.split(' '));
       const content = (s) => norm(s).filter(w => !STOP.has(w));
+      /* The Talk panel had no echo test at all: after speaking with listen on, the mode is stt,
+         so a late transcript of the agent's own voice went straight into the prompt and was sent
+         back as if Mark had said it (Mark 2026-09-17, twice in a row). isEcho does not cover it
+         because its window is 1.5 s and the final lands later. This is the strict version, for
+         text that is about to be treated as Mark's: a long run of words that are nearly all from
+         what was just spoken. Four content words and at most a quarter of them unmatched, so a
+         short human reply ("yeah", "no, the other one") is never swallowed. */
+      function isSpokenBack(text) {
+        if (!synth.speaking && Date.now() - speakEndedAt > 20000) return false;
+        const spoken = new Set(norm(ttsTextarea.value));
+        const words = content(text);
+        if (words.length < 4) return false;
+        return words.filter(w => !spoken.has(w)).length / words.length <= 0.25;
+      }
       function isEcho(text) {
         if (!synth.speaking && Date.now() - speakEndedAt > 1500) return false;
         if (!bargeIn.checked) return true;   // speakers: anything heard while speaking is the agent
@@ -2057,6 +2071,7 @@
           if (event.results[i].isFinal) finalText += t; else interim += t;
         }
         if (currentMode === 'stt') {
+          if (isSpokenBack(finalText || interim)) { clearInterim(); pendingInterim = ''; return; }
           if (finalText) {
             clearInterim();
             const text = dedupe(finalText);
