@@ -2065,6 +2065,7 @@
       }
       function armPause() {
         clearTimeout(pauseTimer);
+        if (muted) return;   // paused: hold the countdown, resume rearms it
         if (micSpeaking()) { pauseTimer = setTimeout(armPause, 400); return; }   // still talking
         if (currentMode === 'stt' && autoOn.checked && (input.value.trim() || pendingInterim)) {
           pauseTimer = setTimeout(flushAndSend, pauseMs());
@@ -2127,6 +2128,7 @@
         armBarge();
       }
       function armBarge() {
+        if (muted) return;   // paused: hold the countdown, resume rearms it
         if (carry && !micSpeaking()) {
           clearTimeout(bargeTimer);
           bargeTimer = setTimeout(() => {
@@ -2169,24 +2171,46 @@
         if (mic.__wanted && !mic.__fatal) { try { origStart.call(mic); } catch { } }
       };
 
-      /* Spec 003: Space mutes and unmutes the mic anywhere in the window. In the prompt box
-         the space is typed as well (the default is not prevented). Same abort path as the
-         speakers mute; the 'end' hook sees __paused and does not restart until unmute. */
+      /* Spec 003/006: Space pauses and resumes the mic anywhere in the window, one press
+         each way (play/pause, not hold-to-pause — there is no keyup handler). A space typed
+         into any field just types a space now (spec 006): the key handler skips entirely
+         when the event target is editable. Same abort path as the speakers mute; the 'end'
+         hook sees __paused and does not restart until resumed. Pausing also holds the
+         auto-send countdown (armPause/armBarge check `muted` before arming, and setMuted
+         clears whatever is already armed), so nothing is ever submitted while paused. */
       let muted = false;
       document.head.appendChild(Object.assign(document.createElement('style'), {
         textContent: '#dictate-btn.muted,#tts-dictate-btn.muted{opacity:.35;text-decoration:line-through}' +
-          '.stt-status.muted::after{content:" (muted, Space to unmute)"}'
+          '.stt-status.muted::after{content:" (paused, Space to resume)"}' +
+          '#pause-btn{width:32px;height:32px;border-radius:50%;padding:0;justify-content:center;' +
+          'flex-shrink:0;background:var(--bg-color);border:1px solid var(--border-color);' +
+          'color:var(--text-color);font-size:15px;line-height:1}' +
+          '#pause-btn:hover{background:var(--hover-color);border-color:var(--accent-color)}' +
+          '#pause-btn.paused{background:var(--danger-color);color:#fff;border-color:var(--danger-color)}'
       }));
+      const pauseBtn = document.createElement('button');
+      pauseBtn.id = 'pause-btn';
+      pauseBtn.tabIndex = -1;
+      pauseBtn.title = 'Pause listening and hold auto-send (Space)';
+      pauseBtn.textContent = '⏸️';
+      pauseBtn.onmousedown = (e) => e.preventDefault();
+      pauseBtn.onclick = () => setMuted(!muted);
+      commandsBtn.insertAdjacentElement('afterend', pauseBtn);
       function setMuted(on) {
         muted = on;
         dictateBtn.classList.toggle('muted', on);
         sttStatus.classList.toggle('muted', on);
+        pauseBtn.classList.toggle('paused', on);
+        pauseBtn.title = on ? 'Resume listening (Space)' : 'Pause listening and hold auto-send (Space)';
+        if (on) { clearTimeout(pauseTimer); clearTimeout(bargeTimer); }
         if (!mic) return;
         if (on) { mic.__paused = true; try { origAbort.call(mic); } catch { } }
         else { mic.__paused = false; if (mic.__wanted && !mic.__fatal) { try { origStart.call(mic); } catch { } } }
       }
       document.addEventListener('keydown', (e) => {
         if (e.key !== ' ' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+        if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+        e.preventDefault();
         setMuted(!muted);
       });
       const origCancel = synth.cancel.bind(synth);
