@@ -35,21 +35,27 @@ function loadHtml(): string {
   return fs.readFileSync(path.resolve(__dirname, 'stts_ui.html'), 'utf-8');
 }
 
-// Chrome is not installed everywhere; Edge is Chromium and speaks the same
-// flags, so fall back to it rather than crashing with ERR_LAUNCHER_NOT_INSTALLED.
+// Edge first, always. The Microsoft Natural voices this window reads with are
+// an Edge feature: Chrome's speechSynthesis sees only the local SAPI voices, so
+// on a machine that had both, every Natural voice vanished from the picker, and
+// Chrome reusing the Edge-written profile dir reset the saved voice as well
+// (2026-09-19). Chrome remains the fallback where Edge is absent, which is the
+// original reason this function exists (ERR_LAUNCHER_NOT_INSTALLED).
 function resolveBrowserPath(): string | undefined {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-  try {
-    const found = ChromeLauncher.Launcher.getFirstInstallation();
-    if (found) return found;
-  } catch {}
   const edges = [
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     '/usr/bin/microsoft-edge',
   ];
-  return edges.find((p) => fs.existsSync(p));
+  const edge = edges.find((p) => fs.existsSync(p));
+  if (edge) return edge;
+  try {
+    const found = ChromeLauncher.Launcher.getFirstInstallation();
+    if (found) return found;
+  } catch {}
+  return undefined;
 }
 
 // The page keeps every setting (voice, rate, auto-send, theme) in this profile's
