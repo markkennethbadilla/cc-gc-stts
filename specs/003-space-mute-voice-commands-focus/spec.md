@@ -7,11 +7,13 @@
   dictation and typing are not disturbed. The mic button shows the
   state, and the window title carries "(muted)" so it is visible from
   the taskbar.
-- **Three Listen-panel voice commands.** "repeat" reads the last answer
-  again. "slower" and "faster" move the speaking rate one step
-  (0.1x) and persist it, the same setting as the slider. "skip" was
-  considered and dropped (Mark 2026-09-09); "pause" was dropped because
-  "wait" in normal speech would trigger it.
+- **Three voice commands.** "repeat" reads the last answer again, and
+  works in the Listen panel and also while the agent is still working
+  (idle), so Mark can say "replay that" before the next answer exists.
+  "slower" and "faster" move the speaking rate one step (0.1x) and
+  persist it, the same setting as the slider. "skip" was considered and
+  dropped (Mark 2026-09-09); "pause" was dropped because "wait" in
+  normal speech would trigger it.
 - **The window no longer jumps to the front.** Bring-to-front on every
   request becomes a setting, "Raise window on request", off by
   default. The window still opens on the first request when it did not
@@ -32,8 +34,10 @@ typing elsewhere on every turn.
   The default action of the key is not prevented, so the textarea
   still receives the space.
 - Voice commands: added to the Listen panel's command matcher next to
-  play it, stop it, got it. "repeat" calls the existing play path.
-  "slower" and "faster" adjust the stored rate and update the slider.
+  play it, stop it, got it. "repeat" calls the existing play path, and
+  the idle mic handler runs the same matcher so "repeat" also works
+  while the agent is working. "slower" and "faster" adjust the stored
+  rate and update the slider.
 - Raise on request: the daemon reads the setting from the page over the
   existing WebSocket (`settings` message on connect and on change) and
   only calls bring-to-front when it is on. A window that is not yet
