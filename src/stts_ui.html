@@ -840,11 +840,12 @@
     document.getElementById('end-btn').onclick = async () => {
       if (isRecording) toggleDictation();
       synth.cancel();
-      if (currentMode === 'tts') {
-        sendSocket({ type: 'close' });
-      } else if (currentMode === 'stt') {
-        sendSocket({ type: 'cancel' });
-      }
+      // Spec 008. End conversation says so, in its own words. It used to send
+      // the normal tts `close` or the stt `cancel`, so the agent could only
+      // guess from an empty reply that he had ended it, and "he said nothing",
+      // "the turn finished" and "he stopped the conversation" all arrived as the
+      // same thing. Now the reply carries a marker no speech can produce.
+      sendSocket({ type: 'ended' });
       await fetch('/api/shutdown', { method: 'POST' }).catch(() => { });
       document.title = 'Conversation ended';
       document.body.innerHTML = '<p style="font-family:system-ui;color:#888;text-align:center;margin-top:40px">Conversation ended. You can close this tab.</p>';

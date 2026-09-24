@@ -5,10 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
+import { CONVERSATION_ENDED } from './protocol.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const FIXED_PORT = 15986;
+// Spec 008: STTS_PORT exists so a test can run a daemon of its own without
+// taking the fixed port from the one serving the agent.
+const FIXED_PORT = Number(process.env.STTS_PORT) || 15986;
 
 type RequestConfig = {
   mode: 'stt' | 'tts';
@@ -350,6 +353,11 @@ wss.on('connection', (socket) => {
       case 'cancel':
       case 'close':   // 'close' is also the page's normal end of a tts turn; it never closes the window
         resolvePending('');
+        return;
+      case 'ended':
+        // Spec 008. End conversation, said in a word the agent cannot mistake
+        // for speech and does not have to infer from an empty string.
+        resolvePending(CONVERSATION_ENDED);
         return;
       case 'barge':
         if (typeof msg.text === 'string' && msg.text.trim()) barge.push(msg.text.trim());
