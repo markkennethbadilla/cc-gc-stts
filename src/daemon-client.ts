@@ -9,6 +9,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const FIXED_PORT = 15986;
 
+// A request the caller abandons must not keep the daemon. The daemon holds one
+// pending request at a time and frees it when this client closes the connection
+// (stts-daemon.ts, `req.on('close')`), so a client that waits forever is a client
+// that wedges every later tool call until the daemon is restarted. That happened
+// on 2026-09-24: a long `tts` with `listen` was heard by nobody, the gateway gave
+// up at its 300-second ceiling, and the daemon stayed busy for four minutes and
+// counting. This bound is therefore set by the gateway's ceiling, not by taste:
+// it has to fire first. A voice turn that needs longer than this is a turn whose
+// text should be split. STTS_REQUEST_TIMEOUT_MS overrides it for a live check.
+export const REQUEST_TIMEOUT_MS = Number(process.env.STTS_REQUEST_TIMEOUT_MS) || 240_000;
+
 export interface SttConfig {
   title: string;
   action: string;
@@ -116,13 +127,17 @@ async function ensureDaemon(): Promise<void> {
   throw new Error('stts daemon failed to start');
 }
 
-function postRequest(body: object): Promise<string> {
+export function postRequest(
+  body: object,
+  port: number = FIXED_PORT,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req = http.request(
       {
         host: '127.0.0.1',
-        port: FIXED_PORT,
+        port,
         path: '/request',
         method: 'POST',
         headers: {
@@ -152,6 +167,16 @@ function postRequest(body: object): Promise<string> {
         });
       }
     );
+    // Destroying the request closes the socket, which is what tells the daemon
+    // to drop the pending request and answer the next caller instead of 409.
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(
+        new Error(
+          `no answer from the voice window within ${Math.round(timeoutMs / 1000)}s; ` +
+            'the request was dropped so the daemon is free for the next call'
+        )
+      );
+    });
     req.on('error', reject);
     req.write(data);
     req.end();

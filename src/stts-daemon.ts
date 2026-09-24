@@ -24,9 +24,24 @@ type RequestConfig = {
 type Pending = {
   config: RequestConfig;
   respond: (text: string) => void;
+  cancel: (reason: string) => void;
 };
 
+// Spec 007. Nothing else frees a pending request that is heard by nobody.
+// The daemon holds one request at a time and a second caller is answered `409
+// busy`, so a request that never resolves makes the voice window unusable for
+// every agent until the daemon is restarted. Measured 2026-09-24: a `tts` with
+// `listen` was spoken into an empty room, the calling tool gave up at the
+// gateway's ceiling, and the request was still held minutes later. The release
+// on the caller's socket closing cannot be relied on either: a client that
+// destroys its request (probed with the built client) leaves the request
+// pending here. So the daemon bounds itself, at the same value the client uses,
+// which is under the gateway's ~300-second tool-call ceiling on purpose: the
+// caller must be the one left waiting, never the daemon.
+const REQUEST_TIMEOUT_MS = Number(process.env.STTS_REQUEST_TIMEOUT_MS) || 240_000;
+
 let pending: Pending | null = null;
+let pendingTimer: NodeJS.Timeout | null = null;
 let pageSocket: WebSocket | null = null;
 let chrome: ChromeLauncher.LaunchedChrome | null = null;
 let chromeLaunching: Promise<void> | null = null;
@@ -158,6 +173,7 @@ async function ensureChrome() {
         if (pending) {
           const p = pending;
           pending = null;
+          clearPendingTimer();
           p.respond('');
         }
       });
@@ -189,10 +205,18 @@ function closeWindow() {
   chrome = null;
 }
 
+function clearPendingTimer() {
+  if (pendingTimer) {
+    clearTimeout(pendingTimer);
+    pendingTimer = null;
+  }
+}
+
 function resolvePending(text: string) {
   if (!pending) return;
   const p = pending;
   pending = null;
+  clearPendingTimer();
   p.respond(text);
   if (p.config.close) setTimeout(closeWindow, 200);
 }
@@ -250,20 +274,40 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ text }));
       },
+      cancel: (reason: string) => {
+        if (responded) return;
+        responded = true;
+        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: reason }));
+      },
     };
     pending = entry;
+    // Spec 007. The watchdog: whoever asked has gone quiet, so the request is
+    // released here rather than holding the daemon until it is restarted.
+    pendingTimer = setTimeout(() => {
+      if (pending !== entry) return;
+      pending = null;
+      pendingTimer = null;
+      entry.cancel(
+        `no answer from the voice window within ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s; the request was released so the next call is not refused`
+      );
+    }, REQUEST_TIMEOUT_MS);
 
-    req.on('close', () => {
+    const release = () => {
       if (!responded && pending === entry) {
         pending = null;
+        clearPendingTimer();
       }
-    });
+    };
+    req.on('close', release);
+    res.on('close', release);
 
     try {
       await ensureChrome();
     } catch (e) {
       // A browser that will not start is one failed request, not a dead daemon.
       pending = null;
+      clearPendingTimer();
       responded = true;
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: `browser launch failed: ${(e as Error).message}` }));
