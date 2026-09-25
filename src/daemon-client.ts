@@ -90,14 +90,31 @@ function resolveDaemonScript(): string {
   return candidates[0];
 }
 
+// Spec 009. The daemon's stderr goes to a file, so a crash leaves its stack
+// behind. With stdio ignored, the daemon died on 2026-09-26 between two voice
+// turns and nothing said why.
+export function daemonLogPath(): string {
+  const base = process.platform === 'win32'
+    ? (process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '.', 'AppData', 'Local'))
+    : path.join(process.env.HOME || '.', '.local', 'share');
+  return path.join(base, 'cc-gc-stts', 'daemon.log');
+}
+
 function spawnDaemon(): void {
   const script = resolveDaemonScript();
+  let out: number | 'ignore' = 'ignore';
+  try {
+    const log = daemonLogPath();
+    fs.mkdirSync(path.dirname(log), { recursive: true });
+    out = fs.openSync(log, 'a');
+  } catch {}
   const child = spawn(process.execPath, [script], {
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', out, out],
     env: process.env,
   });
   child.unref();
+  if (typeof out === 'number') fs.closeSync(out);
 }
 
 async function ensureDaemon(): Promise<void> {
@@ -183,12 +200,30 @@ export function postRequest(
   });
 }
 
+// Spec 009. A reset connection means the daemon went away mid-request, so the
+// window never finished this request. Start a fresh daemon and send it once
+// more; a second failure is reported, never looped on.
+const DAEMON_GONE = new Set(['ECONNRESET', 'ECONNREFUSED', 'EPIPE']);
+
+export async function sendWithRetry(
+  body: object,
+  send: (b: object) => Promise<string> = postRequest,
+  ensure: () => Promise<void> = ensureDaemon
+): Promise<string> {
+  await ensure();
+  try {
+    return await send(body);
+  } catch (e) {
+    if (!DAEMON_GONE.has((e as NodeJS.ErrnoException).code ?? '')) throw e;
+    await ensure();
+    return send(body);
+  }
+}
+
 export async function launchStt(config: SttConfig): Promise<string> {
-  await ensureDaemon();
-  return postRequest({ mode: 'stt', ...config });
+  return sendWithRetry({ mode: 'stt', ...config });
 }
 
 export async function launchTts(config: TtsConfig): Promise<void> {
-  await ensureDaemon();
-  await postRequest({ mode: 'tts', ...config });
+  await sendWithRetry({ mode: 'tts', ...config });
 }

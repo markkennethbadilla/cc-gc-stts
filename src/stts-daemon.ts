@@ -391,5 +391,11 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 
 server.listen(FIXED_PORT, '127.0.0.1');
 
+// Spec 009. stderr is the daemon log (daemon-client.ts spawnDaemon). A start
+// line and an exit line bracket every life, so a death that throws nothing,
+// such as a kill from outside, still shows as a start with no matching exit.
+console.error(`${new Date().toISOString()} daemon start pid ${process.pid}`);
+process.on('exit', (code) => console.error(`${new Date().toISOString()} daemon exit pid ${process.pid} code ${code}`));
+
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
