@@ -670,8 +670,6 @@
                 <dd>Cancel prompt</dd>
                 <dt>send prompt</dt>
                 <dd>Send prompt</dd>
-                <dt>end conversation</dt>
-                <dd>End the conversation</dd>
               </dl>
               <h4>Selection</h4>
               <dl>
@@ -837,7 +835,12 @@
     /* ====================================
        End conversation
        ==================================== */
-    document.getElementById('end-btn').onclick = async () => {
+    document.getElementById('end-btn').onclick = async (e) => {
+      // Spec 014. Only his own press ends it. The spoken "end conversation" command
+      // clicked this button from text, and since the mic stays on between tool calls
+      // (spec 012) any speech with those two words in a row, even an interim guess,
+      // killed the window and the daemon mid-test (2026-09-29, twice).
+      if (!e.isTrusted) return;
       if (isRecording) toggleDictation();
       synth.cancel();
       // Spec 008. End conversation says so, in its own words. It used to send
@@ -1034,7 +1037,7 @@
 
     let inputTimeout;
     const COMMAND_REGEX =
-      /(\s*\binsert\s+comma)|(\s*\binsert\s+period)|(\s*\binsert\s+question\s+mark)|(\s*\binsert\s+exclamation\s+mark)|(\s*\binsert\s+tab)|(([,.?!])\s*new\s+paragraph)|(\s*\bnew\s+paragraph)|(\s*\bselect\s+all)|(\s*\bgo\s+to\s+start)|(\s*\bgo\s+to\s+end)|(\s*\bunselect\s+selection)|(\s*\bdelete\s+selection)|(\s*\bundo\s+it)|(\s*\bredo\s+it)|(\s*\bcancel\s+prompt)|(\s*\bsend\s+prompt)|(\s*\bend\s+conversation)/gi;
+      /(\s*\binsert\s+comma)|(\s*\binsert\s+period)|(\s*\binsert\s+question\s+mark)|(\s*\binsert\s+exclamation\s+mark)|(\s*\binsert\s+tab)|(([,.?!])\s*new\s+paragraph)|(\s*\bnew\s+paragraph)|(\s*\bselect\s+all)|(\s*\bgo\s+to\s+start)|(\s*\bgo\s+to\s+end)|(\s*\bunselect\s+selection)|(\s*\bdelete\s+selection)|(\s*\bundo\s+it)|(\s*\bredo\s+it)|(\s*\bcancel\s+prompt)|(\s*\bsend\s+prompt)/gi;
 
     function extractCommands(text) {
       const regex = new RegExp(COMMAND_REGEX.source, COMMAND_REGEX.flags);
@@ -1069,7 +1072,6 @@
         else if (match[15]) { effects.push(() => document.execCommand('redo', false)); }
         else if (match[16]) { effects.push(() => cancel()); }
         else if (match[17]) { effects.push(() => submit()); }
-        else if (match[18]) { effects.push(() => document.getElementById('end-btn').click()); }
 
         processedText += sub;
         replacements.push({ start: match.index, end: match.index + match[0].length, sub });

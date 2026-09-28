@@ -47,3 +47,21 @@ test('the marker is one definition, shared by both ends', () => {
   // underscores so it cannot be a misheard word either.
   assert.match(CONVERSATION_ENDED, /^__[A-Z_]+__$/);
 });
+
+// Spec 014. The spoken "end conversation" command clicked the button from text, and
+// with the mic on between tool calls any speech holding those two words ended it.
+test('only a real press ends it: the handler ignores a scripted click', () => {
+  assert.match(handler, /if \(!e\.isTrusted\) return;/);
+  assert.ok(handler.indexOf('isTrusted') < handler.indexOf("type: 'ended'"), 'the guard runs before anything is sent');
+});
+
+test('no voice command and no script clicks End conversation', () => {
+  const re = html.match(/const COMMAND_REGEX =\s*(\/.+\/gi);/);
+  assert.ok(re, 'COMMAND_REGEX not found');
+  const cmd = new Function(`return ${re[1]};`)();
+  for (const said of ['end conversation', 'so let us see if this will end conversation now', 'End  Conversation']) {
+    assert.doesNotMatch(said, new RegExp(cmd.source, cmd.flags), said);
+  }
+  assert.doesNotMatch(html, /getElementById\('end-btn'\)\.click\(\)/);
+  assert.doesNotMatch(html, /<dt>end conversation<\/dt>/, 'the commands panel must not offer it');
+});
