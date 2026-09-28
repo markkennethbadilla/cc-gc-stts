@@ -14,8 +14,8 @@ export const NO_SPEECH = '__STTS_NO_SPEECH__';
 // Spec 017. The longest listen the tool schema allows (max 200), under the 240 s
 // call budget. Every empty return is a full model round trip over the whole
 // context, so a short default (it was 20) burned tokens on a silent room, and an
-// agent with a stale schema cannot pass a longer one. An agent waiting on a
-// background result it promised passes a short idleSec itself.
+// agent with a stale schema cannot pass a longer one. Agents always use this
+// default: a background result interrupts the listen on its own.
 export const DEFAULT_IDLE_SEC = 200;
 
 // Spec 012. A listen reached the tool call's time limit (the client has to return

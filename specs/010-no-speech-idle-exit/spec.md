@@ -19,8 +19,8 @@ On 2026-09-28 that was 181 seconds of silence, and it looked like a freeze.
 
 - **The tools** (`stts-mcp-server.ts`) take an optional `idleSec`: on `stt`, and
   on `tts` when `listen` is true. It defaults to 200 (`DEFAULT_IDLE_SEC` in
-  `src/protocol.ts`, spec 017); an agent waiting on a background result passes
-  a short value itself. `0` waits for him, as before. Both tool descriptions say
+  `src/protocol.ts`, spec 017); agents always use that default, because a background
+  result interrupts the listen on its own. `0` waits for him, as before. Both tool descriptions say
   what the marker means, so every agent reads it every session.
 - **The page** (`stts_ui.html`, `armIdle`) starts a timer when a listen begins.
   When it fires, if nothing is typed or heard, it sends `{ type: 'nospeech' }` and

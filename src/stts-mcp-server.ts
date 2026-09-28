@@ -55,7 +55,7 @@ const listenFor = (idle: number | undefined, timeoutMs: number) =>
 const NO_SLEEP_NOTE =
   ' Never sleep or block on another tool to wait for him: to wait, call stt again (the default ' +
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
-  'Pass a short idleSec (about 20) only while a background result you promised him is due.';
+  'Always use the default idleSec and never pass a short one: a background result arrives on its own and interrupts the listen.';
 
 const reply = (...texts: string[]) => ({ content: texts.map((text) => ({ type: 'text' as const, text })) });
 

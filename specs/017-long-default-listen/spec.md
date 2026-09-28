@@ -4,9 +4,10 @@
 
 `stt`, and `tts` with `listen`, wait up to 200 seconds for Mark to speak before
 returning `__STTS_NO_SPEECH__`. It was 20. 200 is the most the tool schema allows
-(`idleSec` max 200) and it stays inside the 240-second call budget (spec 012). An
-agent that is waiting on a background result it promised passes a short
-`idleSec` (about 20) itself.
+(`idleSec` max 200) and it stays inside the 240-second call budget (spec 012).
+Agents always use the default and never pass a short `idleSec`: a background
+result (a subagent notification) arrives on its own and interrupts the listen,
+so there is nothing to poll for (house rule 68).
 
 ## Why it exists
 
@@ -23,7 +24,7 @@ return often.
 - `DEFAULT_IDLE_SEC` in `src/protocol.ts` is 200. The MCP server passes it when
   the agent passes no `idleSec`. The page's idle timer (spec 010) is unchanged.
 - The `/stts` command, the plugin skill and the tool descriptions say the default
-  is already the longest wait, and when to pass a short one.
+  is already the longest wait and to always use it, never a short one.
 
 ## What it reads and writes
 

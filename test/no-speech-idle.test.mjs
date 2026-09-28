@@ -104,3 +104,11 @@ test('both tools pass idleSec and explain the marker', () => {
   assert.match(server, /idleSec: idle \?\? DEFAULT_IDLE_SEC/);
   assert.equal((server.match(/NO_SPEECH_NOTE/g) || []).length, 3, 'defined once, used by stt and tts');
 });
+
+test('spec 017: agents always use the default idleSec, never a short one', () => {
+  for (const f of ['../src/stts-mcp-server.ts', '../commands/stts.md', '../commands/stts.toml', '../skills/stts/SKILL.md']) {
+    const t = readFileSync(new URL(f, import.meta.url), 'utf8');
+    assert.doesNotMatch(t, /short idleSec \(about/, f);
+    assert.match(t, /Always use the default idleSec and never pass a short one/, f);
+  }
+});
