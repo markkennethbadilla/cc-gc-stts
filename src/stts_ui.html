@@ -1894,9 +1894,14 @@
         if (!this.__hooked) {
           this.__hooked = true;
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
-          this.addEventListener('error', (e) => { if (FATAL.has(e.error)) this.__fatal = true; });
-          this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); });
-          this.addEventListener('result', () => { micAlive(); lastResultAt = Date.now(); });
+          this.addEventListener('error', (e) => {
+            if (FATAL.has(e.error)) this.__fatal = true;
+            // 'aborted' is our own abort (speakers mute, pause, restart); anything else is news.
+            if (this === mic && e.error !== 'aborted') { errStreak++; micLog('recognizer error ' + e.error); }
+          });
+          this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); if (this === mic) micRunning = true; });
+          this.addEventListener('audiostart', () => { if (this === mic) heardAt = Date.now(); });
+          this.addEventListener('result', () => { micAlive(); lastResultAt = heardAt = Date.now(); errStreak = 0; });
           this.addEventListener('soundstart', micAlive);
           /* Auto-send used to count from the last word the recognizer wrote down, so a thinking
              pause mid-sentence looked like the end of the turn and the prompt went early, cutting
@@ -1907,14 +1912,16 @@
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
+            if (this === mic) { micRunning = false; endedAt = Date.now(); }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
-            // for the rest of the session. Retry with a widening delay.
+            // for the rest of the session. Retry with a widening delay. Spec 011: an error that
+            // ends every session (network) widens the first delay too, capped at 5 s.
             const retry = (delay) => setTimeout(() => {
               if (!this.__wanted || this.__fatal || this.__paused) return;
-              try { origStart.call(this); } catch { if (delay < 5000) retry(delay * 2); }
+              try { origStart.call(this); } catch { if (delay < 5000) retry(Math.min(delay * 2, 5000)); }
             }, delay);
-            retry(100);
+            retry(Math.min(100 * 2 ** errStreak, 5000));
           });
         }
         this.__wanted = true; this.__fatal = false;
@@ -1938,7 +1945,41 @@
         origActivateStt(config);
         if (carry) { insert(carry); carry = ''; armPause(); }
         armIdle(config.idleSec);
+        heardAt = Date.now();   // spec 011: the quiet clock starts with the listen
       };
+
+      /* Spec 011. A listen whose recognizer has quietly died: the mic icon said listening, Mark
+         talked, nothing was written, and the request ran to its 240 s timeout (2026-09-28, five
+         times). Only a new window fixed it. Edge's recognizer can stop with no error and no
+         'end' (web-speech-api#96, SO 38702797), and a spoken reply's 'end' can go missing
+         (SO 54861046), which left __paused set so nothing ever restarted it. While a listen is
+         pending, check every 2 s and restart the recognizer if it is not running, if it heard
+         speech but wrote no words for 8 s, or if it has had no audio and no words for 15 s.
+         Every restart and every recognizer error goes to daemon.log. */
+      let micRunning = false, endedAt = 0, heardAt = Date.now(), errStreak = 0, restarts = 0;
+      const micLog = (text) => sendSocket({ type: 'log', text });
+      function micVerdict(s) {
+        if (s.mode !== 'stt' || s.muted || s.silenceStop || s.speaking) return null;
+        if (!s.running) return s.now - s.endedAt > 6000 ? 'not running during a listen' : null;
+        if (s.speechAt > s.resultAt && s.now - s.speechAt > 8000) return 'speech heard but no words for 8s';
+        if (s.now - s.heardAt > 15000) return 'no audio or words for 15s during a listen';
+        return null;
+      }
+      setInterval(() => {
+        if (!mic) return;
+        const why = micVerdict({
+          mode: currentMode, muted, silenceStop: stopOnSilence.checked, speaking: synth.speaking,
+          running: micRunning, endedAt, speechAt: speechStartedAt, resultAt: lastResultAt, heardAt, now: Date.now(),
+        });
+        if (!why) return;
+        micLog(`mic restart #${++restarts}: ${why}`);
+        heardAt = endedAt = Date.now(); speechStartedAt = 0;
+        mic.__paused = false; mic.__fatal = false;   // a pause left by a lost speech 'end' is stale in a listen
+        try { origAbort.call(mic); } catch { }
+        // The 'end' hook usually restarts it first; this start covers an abort that fires no 'end'.
+        // A start that finds it already running throws, which is fine.
+        setTimeout(() => { if (!muted) { try { mic.start(); } catch { } } }, 300);
+      }, 2000);
       /* Spec 010. A listen with no idle exit held the agent until Mark spoke or the request timed
          out, so it could not relay background results it had promised him (181 s, 2026-09-28).
          After idleSec with nothing typed or heard, answer __STTS_NO_SPEECH__ and go idle quietly:

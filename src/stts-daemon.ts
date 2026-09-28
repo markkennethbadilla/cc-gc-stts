@@ -367,6 +367,10 @@ wss.on('connection', (socket) => {
       case 'barge':
         if (typeof msg.text === 'string' && msg.text.trim()) barge.push(msg.text.trim());
         return;
+      case 'log':
+        // Spec 011. The page's microphone restarts and recognizer errors, into daemon.log.
+        if (typeof msg.text === 'string') console.error(`${new Date().toISOString()} page ${msg.text.slice(0, 300)}`);
+        return;
       case 'settings':
         raiseOnRequest = !!(msg as { raise?: boolean }).raise;
         return;
