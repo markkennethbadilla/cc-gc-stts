@@ -87,3 +87,15 @@ test('the daemon side and the page side agree on the message names', () => {
   assert.match(daemon, /case 'stopped':/);
   assert.match(html, /speakEndedAt = Date\.now\(\);\s*interruptTts\(\);/, 'talking over it (headphone mode) stops a reading');
 });
+
+test('sending or cancelling a prompt never switches the mic off (live CDP finding 2026-09-28)', () => {
+  assert.match(html, /const origSubmit = withSuppressed\(submit\);/);
+  assert.match(html, /cancel = withSuppressed\(cancel\);/);
+  // upstream really does stop dictation in both, which is why they must be suppressed
+  assert.match(html, /async function submit\(\) \{[\s\S]*?if \(isRecording\) toggleDictation\(\);/);
+  assert.match(html, /async function cancel\(\) \{\s*if \(isRecording\) toggleDictation\(\);/);
+});
+
+test('a cancel with nothing playing is not "speech just ended", so the echo filter keeps his next words', () => {
+  assert.match(html, /SpeechSynthesis\.prototype\.cancel = function \(\) \{\s*if \(this\.speaking \|\| this\.pending\) noteEnd\(\); else unmuteMic\(\);/);
+});

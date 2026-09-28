@@ -2144,12 +2144,18 @@
           pauseTimer = setTimeout(flushAndSend, pauseMs());
         }
       }
-      const origSubmit = submit;
+      /* Spec 012. Upstream submit and cancel stop dictation (`if (isRecording) toggleDictation()`),
+         and they were not suppressed like resetToIdle, so every sent prompt switched the mic OFF
+         for as long as the agent worked. Seen live on 2026-09-28 over CDP: currentMode went to null
+         and isRecording to false one second later, and speech between tool calls was never heard.
+         The mic is one always-on microphone: sending a prompt never stops it. */
+      const origSubmit = withSuppressed(submit);
       submit = function () {
         clearTimeout(pauseTimer);
         flushInterim();
         return origSubmit();
       };
+      cancel = withSuppressed(cancel);
       sendBtn.onclick = submit;
 
       function onResult(event) {
@@ -2332,7 +2338,14 @@
         u.addEventListener('end', noteEnd); u.addEventListener('error', noteEnd);
         return wrapped.call(this, u);
       })(SpeechSynthesis.prototype.speak);
-      SpeechSynthesis.prototype.cancel = function () { noteEnd(); return origCancel(); };
+      /* Spec 012. resetToIdle cancels speech on every turn change, including right after Mark's
+         prompt is sent, when nothing is playing. Stamping that as "speech just ended" made the
+         echo filter drop the first 1.5 s of whatever he said next (speakers mode). Only a cancel
+         that actually cut speech counts as the end of speech; the mic is resumed either way. */
+      SpeechSynthesis.prototype.cancel = function () {
+        if (this.speaking || this.pending) noteEnd(); else unmuteMic();
+        return origCancel();
+      };
     })();
   </script>
 </body>

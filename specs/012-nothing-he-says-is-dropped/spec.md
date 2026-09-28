@@ -89,3 +89,21 @@ page is checked live by Mark after the window is reopened.
 Hand over: this spec, `src/stts-daemon.ts`, `src/daemon-client.ts`,
 `src/stts-mcp-server.ts`, `src/stts_ui.html` (the fork script block), and the two
 tests.
+
+## Live finding after the first release (2026-09-28)
+
+The first release still lost speech between tool calls. Read over the window's
+DevTools port: one second after a prompt was sent, `isRecording` was `false`.
+Upstream `submit` and `cancel` stop dictation, and the fork had not suppressed
+them the way it suppresses `resetToIdle`, so the mic was off for as long as the
+agent worked. A second fault hid behind it: `resetToIdle` cancels speech on every
+turn change, and that cancel was stamped as "speech just ended", so in speakers
+mode the echo filter threw away anything said within 1.5 seconds of it.
+
+Both are fixed: sending or cancelling never stops the mic, and only a cancel that
+cut real speech counts as the end of speech. Proved in a private headless Edge
+with a stand-in recognizer, served by a daemon on a test port: with the previous
+build the mic was off after a send and the next listen came back empty; with this
+one the mic stayed on and the next listen held everything said between calls
+(three runs). The already-open window keeps the old page until it is closed and
+reopened.
