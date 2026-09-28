@@ -1937,7 +1937,24 @@
         prov = null; pendingInterim = '';
         origActivateStt(config);
         if (carry) { insert(carry); carry = ''; armPause(); }
+        armIdle(config.idleSec);
       };
+      /* Spec 010. A listen with no idle exit held the agent until Mark spoke or the request timed
+         out, so it could not relay background results it had promised him (181 s, 2026-09-28).
+         After idleSec with nothing typed or heard, answer __STTS_NO_SPEECH__ and go idle quietly:
+         the mic stays live, and anything he says next is a barge-in or the next prompt. */
+      let idleTimer = null;
+      function armIdle(sec) {
+        clearTimeout(idleTimer);
+        if (!(sec > 0)) return;
+        const fire = () => {
+          if (currentMode !== 'stt' || input.value.trim() || pendingInterim) return;   // he is answering
+          if (micSpeaking()) { idleTimer = setTimeout(fire, 1000); return; }
+          sendSocket({ type: 'nospeech' });
+          resetToIdle();
+        };
+        idleTimer = setTimeout(fire, sec * 1000);
+      }
       const origActivateTts = activateTts;
       activateTts = function (config) {
         const r = withSuppressed(origActivateTts)(config);

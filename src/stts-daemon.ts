@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
-import { CONVERSATION_ENDED } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH } from './protocol.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +22,7 @@ type RequestConfig = {
   text?: string;
   oneshot?: boolean;
   close?: boolean;       // spec 004: close the window once this request is answered
+  idleSec?: number;      // spec 010: stt only, answer NO_SPEECH after this long with nothing heard
 };
 
 type Pending = {
@@ -353,6 +354,10 @@ wss.on('connection', (socket) => {
       case 'cancel':
       case 'close':   // 'close' is also the page's normal end of a tts turn; it never closes the window
         resolvePending('');
+        return;
+      case 'nospeech':
+        // Spec 010. Nothing heard within idleSec. Only an stt request can end this way.
+        if (pending?.config.mode === 'stt') resolvePending(NO_SPEECH);
         return;
       case 'ended':
         // Spec 008. End conversation, said in a word the agent cannot mistake

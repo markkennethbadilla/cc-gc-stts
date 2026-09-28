@@ -3,7 +3,14 @@ name: stts
 description: User speaks the prompt, which is sent to the Model, the received response is spoken/read aloud in a loop.
 ---
 
-Call the stt MCP tool once and read its response. If the response is empty, call the tts tool with the text 'Done.' and close set to true, which speaks it and closes the voice window, then stop. Otherwise, treat the response as a prompt and answer it. Pass that answer to the tts MCP tool with listen set to true: it speaks the answer, then listens and returns the next thing the user said, so one tool call serves each turn. Treat that return value exactly like an stt response (empty means done: say 'Done.' through tts with close true) and repeat. While the loop is running, do not output anything else to the user.
+Call the stt MCP tool once and read its response. It is one of four things, and each has its own move:
+
+- Exactly `__STTS_CONVERSATION_ENDED__`: he pressed End conversation and the window is already gone. Speak nothing, call no tool, stop.
+- Exactly `__STTS_NO_SPEECH__`: he has not spoken yet, and the window is still listening. If a background result you promised him has landed, speak it through tts with listen true. Otherwise call stt again, silently. This is never the end of the conversation.
+- Empty: the prompt was cancelled. Call the tts tool with the text 'Done.' and close set to true, which speaks it and closes the voice window, then stop.
+- Anything else is his prompt. Answer it, and pass that answer to the tts MCP tool with listen set to true: it speaks the answer, then listens and returns the next thing he said, so one tool call serves each turn.
+
+Treat every tts listen return exactly like an stt response and repeat. While the loop is running, do not output anything else to the user.
 
 Speak before you work, and speak at the end. If answering the prompt needs any tool call, first pass one short sentence to the tts tool with listen false, saying what you are about to do, then start. Silence while tools run reads as a hang. During the work, speak only at three moments, each one sentence with listen false: you hit a wall that needs the user (a code on their phone, an irreversible action), the plan changed from what they would expect, or the quiet is about to pass two minutes, in which case name the phase you are in. Never narrate individual tool calls or partial results; the user cares about the end result, and a running commentary is noise. The final answer always goes to tts with listen true, as above.
 

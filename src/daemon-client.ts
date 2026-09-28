@@ -25,6 +25,7 @@ export interface SttConfig {
   action: string;
   initialText: string;
   startRecording: boolean;
+  idleSec?: number;
 }
 
 export interface TtsConfig {
