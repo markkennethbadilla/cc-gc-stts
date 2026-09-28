@@ -26,7 +26,7 @@ server can read the file itself.
   budget (spec 012), so the call returns in time. If parts remain, it says
   `Read parts 1 to 5 of 20. To go on, call tts again with the same file and
   part=6.` and does not listen in between.
-- "stop it", the stop button, or talking over it in headphone mode ends the turn.
+- A press of the stop button ends the turn (talking over it is spec 016).
   The page sends `stopped`, the daemon answers `__STTS_STOPPED__`, the reading
   goes no further, and the reply says which part to resume at. With `listen`, it
   goes straight to listening.

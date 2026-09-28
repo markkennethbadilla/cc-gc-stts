@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { launchStt, launchTts, REQUEST_TIMEOUT_MS } from './daemon-client.ts';
-import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED, HEARD } from './protocol.ts';
 import { loadText, toParts } from './read-aloud.ts';
 
 const ENDED_NOTE =
@@ -50,6 +50,12 @@ const listenFor = (idle: number | undefined, timeoutMs: number) =>
         timeoutMs,
       });
 
+// Spec 015. Waiting for him is itself a listen: a sleep or any other blocking
+// tool leaves him talking to an agent that cannot answer until it returns.
+const NO_SLEEP_NOTE =
+  ' Never sleep or block on another tool to wait for him: to wait, call stt again with a long ' +
+  'idleSec (up to 200), so you answer the moment he stops talking.';
+
 const reply = (...texts: string[]) => ({ content: texts.map((text) => ({ type: 'text' as const, text })) });
 
 const server = new McpServer({ name: 'stts-mcp', version: '1.0.0' });
@@ -61,7 +67,8 @@ server.registerTool(
       'Show the speech-to-text dialog and return the transcribed text the user spoke.' +
       ENDED_NOTE +
       NO_SPEECH_NOTE +
-      CONTINUES_NOTE,
+      CONTINUES_NOTE +
+      NO_SLEEP_NOTE,
     inputSchema: { idleSec },
   },
   async ({ idleSec }) => reply(await listenFor(idleSec, CALL_BUDGET_MS))
@@ -75,12 +82,16 @@ server.registerTool(
       'exists (a story, a chapter, notes, a document), pass file (a local path) or url (plain text or ' +
       'markdown, not an HTML page) instead of copying it into text: the server reads and speaks it, so ' +
       'you do not spend output on it. Markdown files are read without their markup. Long content is ' +
-      'read in parts; if the call returns before the end, it says which part to pass next. "stop it" ' +
-      'or talking over it stops the reading and it says where. With listen=true it then opens ' +
+      'read in parts; if the call returns before the end, it says which part to pass next. The Stop ' +
+      'button stops the reading and it says where. Nothing he says controls the window: if he talks ' +
+      'over you, the call returns at once with his words while your voice keeps playing, and you ' +
+      'decide. Meant for you: answer (your next stts call cuts the playback). Not for you (a TV, ' +
+      'someone else): call tts again to go on from where it names. With listen=true it then opens ' +
       'speech-to-text at once and returns what the user said next, saving a round trip per turn.' +
       ENDED_NOTE +
       NO_SPEECH_NOTE +
-      CONTINUES_NOTE,
+      CONTINUES_NOTE +
+      NO_SLEEP_NOTE,
     inputSchema: {
       text: z.string().optional().describe('The text to speak. Give exactly one of text, file or url.'),
       file: z.string().optional().describe('Local path of a text or markdown file to read aloud, instead of text.'),
@@ -105,6 +116,7 @@ server.registerTool(
 
     let i = first;
     let stopped = false;
+    let over: string | null = null;
     for (; i < parts.length; i++) {
       if (i > first && Date.now() - t0 > READ_BUDGET_MS) break;
       const last = i === parts.length - 1;
@@ -117,10 +129,20 @@ server.registerTool(
         timeoutMs: left(),
       });
       if (r === STOPPED) { stopped = true; break; }
+      if (r.startsWith(HEARD)) { over = r.slice(HEARD.length).trim(); break; }
     }
 
     const n = parts.length;
     const where = file ? 'the same file' : url ? 'the same url' : 'the same text';
+    // Spec 016. His words over the agent's voice come back at once; the agent decides.
+    if (over !== null) {
+      const goOn = n > 1 ? `call tts with ${where} and part=${i + 1}` : 'say it again, or the rest of it, with tts';
+      return reply(
+        `He spoke while you were speaking: "${over}". Your voice is still playing until your next stts call. ` +
+          `If it was meant for you, answer it with tts (listen=true); that cuts the playback. ` +
+          `If it was not (a TV, someone else in the room), ${goOn}.`
+      );
+    }
     let note = '';
     if (stopped) {
       note = n > 1 ? `He stopped it during part ${i + 1} of ${n}. To resume there, call tts with ${where} and part=${i + 1}.` : 'He stopped it.';

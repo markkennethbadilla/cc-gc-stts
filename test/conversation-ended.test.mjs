@@ -56,12 +56,8 @@ test('only a real press ends it: the handler ignores a scripted click', () => {
 });
 
 test('no voice command and no script clicks End conversation', () => {
-  const re = html.match(/const COMMAND_REGEX =\s*(\/.+\/gi);/);
-  assert.ok(re, 'COMMAND_REGEX not found');
-  const cmd = new Function(`return ${re[1]};`)();
-  for (const said of ['end conversation', 'so let us see if this will end conversation now', 'End  Conversation']) {
-    assert.doesNotMatch(said, new RegExp(cmd.source, cmd.flags), said);
-  }
+  // Spec 016: there are no voice commands at all.
+  assert.doesNotMatch(html, /COMMAND_REGEX/);
   assert.doesNotMatch(html, /getElementById\('end-btn'\)\.click\(\)/);
   assert.doesNotMatch(html, /<dt>end conversation<\/dt>/, 'the commands panel must not offer it');
 });

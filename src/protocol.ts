@@ -20,6 +20,11 @@ export const DEFAULT_IDLE_SEC = 20;
 // the next stt (or tts with listen) returns it. Call stt again at once.
 export const LISTEN_CONTINUES = '__STTS_LISTEN_CONTINUES__';
 
-// Spec 013. He stopped the speaking turn ("stop it", the stop button, or talking
-// over it in headphone mode). A reading stops here instead of going on.
+// Spec 013, 016. He pressed the stop button. A reading stops here instead of going on.
 export const STOPPED = '__STTS_STOPPED__';
+
+// Spec 016. He talked while the agent was speaking (headphone mode). The page
+// controls nothing on his words: the voice keeps playing, and the tts call
+// returns at once with this marker, a space, and what he said, so the agent
+// decides whether it was meant for it.
+export const HEARD = '__STTS_HEARD__';

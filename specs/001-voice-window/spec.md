@@ -67,12 +67,7 @@ being lost.
 
 ## Voice commands
 
-Talk panel: insert comma, insert period, insert question mark, insert
-exclamation mark, insert tab, new paragraph, go to start, go to end,
-cancel prompt, send prompt, select all, unselect
-selection, delete selection, undo it, redo it.
-
-Listen panel: play it, stop it, got it.
+None (spec 016). Everything he says is transcript for the agent.
 
 ## Known limits
 

@@ -198,6 +198,47 @@ test('tts: a long answer plus its listen still returns inside the budget', async
   assert.ok(Date.now() - t < BUDGET + 500, `took ${Date.now() - t}ms`);
 });
 
+// Spec 016. Words over the agent's voice return the call at once; nothing is stopped for him.
+test('tts: talking over it returns his words at once, three times over', async () => {
+  page.got = [];
+  for (let k = 0; k < 3; k++) {
+    page.onRequest = (m) => { if (m.type === 'request') setTimeout(() => send({ type: 'heard', text: `  is that the TV ${k} ` }), 20); };
+    const t = Date.now();
+    const out = await call({ text: 'a long answer', listen: true });
+    assert.ok(Date.now() - t < 1000, `took ${Date.now() - t}ms`);
+    assert.match(out[0], new RegExp(`He spoke while you were speaking: "is that the TV ${k}"`));
+    assert.match(out[0], /say it again/);
+    assert.equal(page.got.filter((m) => m.type === 'request' && m.config.mode === 'stt').length, 0, 'no listen after');
+    page.got = [];
+  }
+});
+
+test('tts file: talking over part 2 names part 2 to go on from', async () => {
+  let n = 0;
+  page.onRequest = (m) => {
+    if (m.type !== 'request') return;
+    n++;
+    setTimeout(() => send(n === 2 ? { type: 'heard', text: 'hang on' } : { type: 'close' }), 10);
+  };
+  const out = await call({ file: bookFile() });
+  assert.equal(n, 2);
+  assert.match(out[0], /"hang on".*part=2/);
+});
+
+test('heard with nothing pending is kept for the next listen; empty heard is ignored', async () => {
+  page.onRequest = () => {};
+  send({ type: 'heard', text: '   ' });
+  send({ type: 'heard', text: 'after you finished' });
+  await wait(50);
+  page.onRequest = (m) => { if (m.type === 'request') send({ type: 'nospeech' }); };
+  assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, 'after you finished');
+});
+
+test('barge reports the window as open while it is connected (spec 015)', async () => {
+  const b = await (await fetch(`http://127.0.0.1:${PORT}/barge`)).json();
+  assert.equal(b.open, true);
+});
+
 test('tts: bad arguments are refused with a reason', async () => {
   for (const [args, re] of [[{}, /exactly one/], [{ text: 'a', file: 'b' }, /exactly one/], [{ file: 'Z:/no/such.txt' }, /ENOENT|no such/i], [{ text: 'a', part: 9 }, /past the end/]]) {
     const r = await client.callTool({ name: 'tts', arguments: args });

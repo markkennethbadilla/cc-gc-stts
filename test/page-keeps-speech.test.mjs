@@ -85,7 +85,9 @@ test('the daemon side and the page side agree on the message names', () => {
   assert.match(daemon, /type: 'released'/);
   assert.match(src[0], /sendSocket\(\{ type: 'stopped' \}\)/);
   assert.match(daemon, /case 'stopped':/);
-  assert.match(html, /speakEndedAt = Date\.now\(\);\s*interruptTts\(\);/, 'talking over it (headphone mode) stops a reading');
+  // Spec 016: talking over it hands his words to the agent and stops nothing.
+  assert.match(html, /if \(heard\) sendSocket\(\{ type: 'heard', text: heard \}\);/);
+  assert.match(daemon, /case 'heard':/);
 });
 
 test('sending or cancelling a prompt never switches the mic off (live CDP finding 2026-09-28)', () => {

@@ -27,7 +27,7 @@ Talk to **Claude Code**, **Gemini CLI** or **Antigravity CLI aka agy** and hear 
 2.  **Daemon:** A local HTTP + WebSocket server on port `15986` that controls a Chrome instance in "app mode". Stores its profile under `$TMPDIR/cc-gc-stts-user-data-dir`.
 3.  **Browser UI ↔ Daemon:** A single persistent **WebSocket** at `/ws` carries every per-turn message. The daemon pushes a `request` frame the moment the model calls `stt` or `tts`; the page pushes back `complete` / `cancel` / `close` when the user is done.
 4.  **Browser UI:** Uses the native **Web Speech API** for recognition and synthesis. Free at the wallet — note that on Linux Chrome routes recognition audio through Google's servers, so this is not a fully offline pipeline.
-5.  **Smart Auto-Advance:** In the `/stts` voice loop, if you simply listen through the response without touching anything, the loop advances automatically the moment speech ends. Pressing **Stop** (or saying "stop it") ends the speaking turn at once, which also stops a long reading (spec 013); pressing **Play** (or saying "play it") replays and waits for a manual **Got it!**.
+5.  **Smart Auto-Advance:** In the `/stts` voice loop, if you simply listen through the response without touching anything, the loop advances automatically the moment speech ends. Pressing **Stop** ends the speaking turn at once, which also stops a long reading (spec 013); pressing **Play** replays and waits for a manual **Got it!**. Nothing you say controls the window (spec 016): talking over the agent in headphone mode hands your words to the agent at once while its voice keeps playing, and the agent decides whether to answer or go on.
 6.  **Automatic Lifecycle:** The daemon starts on demand and shuts down when the Chrome window is closed.
 7.  **Port-collision aware:** If port `15986` is held by a non-stts process, the launcher fails fast with a clear error instead of timing out.
 
@@ -69,29 +69,16 @@ Run the voice-driven loop where you speak, the model processes, and the response
 ### Direct Tool Usage
 You can also ask the model to "use the stt tool" or "speak this using tts" directly in your prompts.
 
-## 🗣️ Voice Commands & Shortcuts
+## Shortcuts
 
-Both STT and TTS modes support voice-activated commands for a hands-free experience.
-
-### Popular Commands
-| Command | Action |
-| :--- | :--- |
-| `send prompt` | Submits your dictated text |
-| `cancel prompt` | Aborts the current recording |
-| `new paragraph` | Inserts a line break |
-| `got it` | (TTS mode) Acknowledges the response and continues — only required if you used **Stop** or **Play** during playback; otherwise the loop auto-advances |
-| `stop it` | (TTS mode) Stops the current playback (after this, **Got it!** is required to advance) |
-| `play it` | (TTS mode) Replays the response (after this, **Got it!** is required to advance) |
-
-> **Note:** Many more punctuation and formatting commands are supported (e.g., `insert comma`, `select all`, `undo it`). Toggle the side panel to see the full list.
+There are no voice commands (spec 016). Everything you say is transcript for
+the agent; if you meant stop, repeat, or send, the agent does it.
 
 **Keyboard Shortcuts:**
-- `Ctrl+R`: Toggle recording/playback side panel.
+- `Ctrl+R`: Toggle recording.
 - `Enter`: Send prompt (Talk side).
-- `Escape`: Stop recording or close the commands panel.
+- `Escape`: Stop recording.
 - `Alt+↑` / `Alt+↓`: Cycle through prompt or response history when the textarea is focused.
-
-![Voice command side panel](screenshots/stts-voice-commands.png)
 
 ## 🕘 Prompt & Response History
 

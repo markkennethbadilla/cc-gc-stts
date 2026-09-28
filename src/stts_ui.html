@@ -635,60 +635,7 @@
         <div class="commands-panel" id="commands-panel">
           <button class="close-panel" id="close-panel" title="Close">&times;</button>
           <h3>Voice Commands</h3>
-          <div class="commands-columns">
-            <div>
-              <h4>Punctuation</h4>
-              <dl>
-                <dt>insert comma</dt>
-                <dd>Inserts <b>,</b></dd>
-                <dt>insert period</dt>
-                <dd>Inserts <b>.</b></dd>
-                <dt>insert question mark</dt>
-                <dd>Inserts <b>?</b></dd>
-                <dt>insert exclamation mark</dt>
-                <dd>Inserts <b>!</b></dd>
-                <dt>insert tab</dt>
-                <dd>Inserts a tab character</dd>
-              </dl>
-              <h4>Formatting</h4>
-              <dl>
-                <dt>new paragraph</dt>
-                <dd>Ends sentence, starts new paragraph</dd>
-              </dl>
-              <h4>Navigation</h4>
-              <dl>
-                <dt>go to start</dt>
-                <dd>Moves cursor to beginning</dd>
-                <dt>go to end</dt>
-                <dd>Moves cursor to end</dd>
-              </dl>
-            </div>
-            <div>
-              <h4>Control</h4>
-              <dl>
-                <dt>cancel prompt</dt>
-                <dd>Cancel prompt</dd>
-                <dt>send prompt</dt>
-                <dd>Send prompt</dd>
-              </dl>
-              <h4>Selection</h4>
-              <dl>
-                <dt>select all</dt>
-                <dd>Selects all text</dd>
-                <dt>unselect selection</dt>
-                <dd>Collapses selection, keeps text</dd>
-                <dt>delete selection</dt>
-                <dd>Deletes the selected text</dd>
-              </dl>
-              <h4>History</h4>
-              <dl>
-                <dt>undo it</dt>
-                <dd>Undoes last action</dd>
-                <dt>redo it</dt>
-                <dd>Redoes last undone action</dd>
-              </dl>
-            </div>
-          </div>
+          <!-- Spec 016: no voice commands. -->
         </div>
         <div class="bottom-bar">
           <div class="status-area">
@@ -699,7 +646,7 @@
                   d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             </button>
-            <button id="commands-btn" title="Voice commands cheat sheet" tabindex="-1">&#x1f5e3;&#xfe0f;</button>
+            <button id="commands-btn" style="display:none" title="Voice commands cheat sheet" tabindex="-1">&#x1f5e3;&#xfe0f;</button>
             <div class="stt-status" id="stt-status">Listening...</div>
           </div>
           <div class="actions">
@@ -727,22 +674,7 @@
         <div class="commands-panel" id="tts-commands-panel">
           <button class="close-panel" id="tts-close-panel" title="Close">&times;</button>
           <h3>Voice Commands</h3>
-          <div class="commands-columns">
-            <div>
-              <h4>Playback</h4>
-              <dl>
-                <dt>play it</dt>
-                <dd>Play the response</dd>
-                <dt>stop it</dt>
-                <dd>Stop playback</dd>
-              </dl>
-              <h4>Control</h4>
-              <dl>
-                <dt>got it</dt>
-                <dd>Continue to next prompt</dd>
-              </dl>
-            </div>
-          </div>
+          <!-- Spec 016: no voice commands. -->
         </div>
         <div class="bottom-bar">
           <div class="status-area">
@@ -753,7 +685,7 @@
                   d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             </button>
-            <button id="tts-commands-btn" title="Voice commands cheat sheet" tabindex="-1">&#x1f5e3;&#xfe0f;</button>
+            <button id="tts-commands-btn" style="display:none" title="Voice commands cheat sheet" tabindex="-1">&#x1f5e3;&#xfe0f;</button>
             <div class="visualizer" id="visualizer">
               <div class="bar" style="animation-delay: 0s"></div>
               <div class="bar" style="animation-delay: 0.1s"></div>
@@ -1036,52 +968,9 @@
     };
 
     let inputTimeout;
-    const COMMAND_REGEX =
-      /(\s*\binsert\s+comma)|(\s*\binsert\s+period)|(\s*\binsert\s+question\s+mark)|(\s*\binsert\s+exclamation\s+mark)|(\s*\binsert\s+tab)|(([,.?!])\s*new\s+paragraph)|(\s*\bnew\s+paragraph)|(\s*\bselect\s+all)|(\s*\bgo\s+to\s+start)|(\s*\bgo\s+to\s+end)|(\s*\bunselect\s+selection)|(\s*\bdelete\s+selection)|(\s*\bundo\s+it)|(\s*\bredo\s+it)|(\s*\bcancel\s+prompt)|(\s*\bsend\s+prompt)/gi;
-
+    // Spec 016. No voice commands: every word he says is transcript for the agent.
     function extractCommands(text) {
-      const regex = new RegExp(COMMAND_REGEX.source, COMMAND_REGEX.flags);
-      let processedText = '';
-      let hasRealText = false;
-      let hasTextOutput = false;
-      const effects = [];
-      const replacements = [];
-      let deletesSelection = false;
-      let lastIndex = 0;
-      let match;
-
-      while ((match = regex.exec(text)) !== null) {
-        const before = text.substring(lastIndex, match.index);
-        processedText += before;
-        if (before.trim()) hasRealText = true;
-
-        let sub = '';
-        if (match[1]) { sub = ', '; hasTextOutput = true; }
-        else if (match[2]) { sub = '. '; hasTextOutput = true; }
-        else if (match[3]) { sub = '? '; hasTextOutput = true; }
-        else if (match[4]) { sub = '! '; hasTextOutput = true; }
-        else if (match[5]) { sub = '\t'; hasTextOutput = true; }
-        else if (match[6]) { sub = match[7] + '\n\n'; hasTextOutput = true; }
-        else if (match[8]) { sub = '.\n\n'; hasTextOutput = true; }
-        else if (match[9]) { effects.push(() => input.select()); }
-        else if (match[10]) { effects.push(() => input.setSelectionRange(0, 0)); }
-        else if (match[11]) { effects.push(() => input.setSelectionRange(input.value.length, input.value.length)); }
-        else if (match[12]) { effects.push(() => { const pos = input.selectionStart; input.setSelectionRange(pos, pos); }); }
-        else if (match[13]) { deletesSelection = true; }
-        else if (match[14]) { effects.push(() => document.execCommand('undo', false)); }
-        else if (match[15]) { effects.push(() => document.execCommand('redo', false)); }
-        else if (match[16]) { effects.push(() => cancel()); }
-        else if (match[17]) { effects.push(() => submit()); }
-
-        processedText += sub;
-        replacements.push({ start: match.index, end: match.index + match[0].length, sub });
-        lastIndex = regex.lastIndex;
-      }
-
-      processedText += text.substring(lastIndex);
-      if (text.substring(lastIndex).trim()) hasRealText = true;
-
-      return { processedText, replacements, replaceSelection: hasRealText || hasTextOutput, effects, deletesSelection };
+      return { processedText: text, replacements: [], replaceSelection: true, effects: [], deletesSelection: false };
     }
 
     let isProcessing = false;
@@ -1268,20 +1157,9 @@
       }
     });
 
-    const TTS_COMMAND_REGEX = /(\s*\bplay\s+it)|(\s*\bstop\s+it)|(\s*\bgot\s+it)/gi;
-
-    function extractTtsCommands(text) {
-      const regex = new RegExp(TTS_COMMAND_REGEX.source, TTS_COMMAND_REGEX.flags);
-      const effects = [];
-      let match;
-
-      while ((match = regex.exec(text)) !== null) {
-        if (match[1]) { effects.push(() => playBtn.click()); }
-        else if (match[2]) { effects.push(() => stopBtn.click()); }
-        else if (match[3]) { effects.push(() => gotitBtn.click()); }
-      }
-
-      return { effects };
+    // Spec 016. No voice commands in the Listen panel either; the buttons are the controls.
+    function extractTtsCommands() {
+      return { effects: [] };
     }
 
     // TTS Speech Recognition
@@ -1817,16 +1695,6 @@
       }
       rateRange.oninput = () => setRate(rateRange.valueAsNumber);
 
-      /* Spec 003: Listen-panel voice commands "repeat", "slower", "faster" next to upstream's
-         play it, stop it, got it. A rate change while the agent talks replays at the new rate. */
-      const origExtractTts = extractTtsCommands;
-      extractTtsCommands = function (text) {
-        const r = origExtractTts(text);
-        if (/\brepeat\b/i.test(text)) r.effects.push(() => playBtn.click());
-        if (/\bslower\b/i.test(text)) r.effects.push(() => { setRate(rate() - 0.1); if (synth.speaking) playBtn.click(); });
-        if (/\bfaster\b/i.test(text)) r.effects.push(() => { setRate(rate() + 0.1); if (synth.speaking) playBtn.click(); });
-        return r;
-      };
 
       const origSpeak = SpeechSynthesis.prototype.speak;
       SpeechSynthesis.prototype.speak = function (u) {
@@ -2060,8 +1928,7 @@
         input.setSelectionRange(input.value.length, input.value.length);
       }
       function stripCommands(text) {
-        return text.replace(new RegExp(TTS_COMMAND_REGEX.source, TTS_COMMAND_REGEX.flags), ' ')
-          .replace(/\b(repeat|slower|faster)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+        return text.replace(/\s+/g, ' ').trim();
       }
       // Speech that is mostly words from the text being spoken, heard while it is spoken or just
       // after, is the agent's own voice coming back through the mic.
@@ -2182,20 +2049,13 @@
           return;
         }
         const text = finalText || interim;
-        // "repeat" (and friends) also work while idle -- currentMode === null, agent working --
-        // so Mark can say "replay that" while waiting instead of only after the agent finishes.
-        if ((currentMode === 'tts' || currentMode === null) && finalText) {
-          const { effects } = extractTtsCommands(finalText);
-          if (effects.length) { setTimeout(() => effects.forEach(fn => fn()), 0); return; }
-        }
         if (isEcho(text)) return;
         if (currentMode === 'tts') {
-          if (bargeIn.checked && (synth.speaking || finalText)) {
-            const kept = stripCommands(finalText ? dedupe(finalText) : '');
-            if (finalText) { flushed = ''; } else { flushed = interim; flushedAt = Date.now(); }
-            carry = [carry, kept || (finalText ? '' : stripCommands(interim))].filter(Boolean).join(' ');
-            speakEndedAt = Date.now();
-            interruptTts();
+          /* Spec 016. Talking over the agent controls nothing: the voice keeps playing and his
+             words go to the agent at once, which decides whether they were meant for it. */
+          if (bargeIn.checked && finalText) {
+            const heard = dedupe(finalText).trim();
+            if (heard) sendSocket({ type: 'heard', text: heard });
           }
           return;
         }
@@ -2237,8 +2097,7 @@
         resetToIdle();
         if (said) { carry = [carry, said].filter(Boolean).join(' '); armBarge(); }
       };
-      /* Spec 013. "stop it", the stop button, and talking over the agent (headphone mode) end the
-         speaking turn and say so, so a long reading stops for good instead of going on to its next
+      /* Spec 013, 016. A press of the stop button ends the speaking turn and says so, so a long reading stops for good instead of going on to its next
          part, and a tts with listen goes straight to listening instead of waiting out the time limit. */
       function interruptTts() {
         synth.cancel(); gotitBtn.disabled = true;
