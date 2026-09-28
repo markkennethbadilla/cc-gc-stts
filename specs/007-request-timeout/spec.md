@@ -33,12 +33,16 @@ So the bound has to be the daemon's own, and both ends carry it.
 Both the daemon and the client use `REQUEST_TIMEOUT_MS`: **240 seconds**, or
 `STTS_REQUEST_TIMEOUT_MS` when that is set.
 
-- **The client** (`daemon-client.ts`) sets it on the request and destroys the
-  request on expiry, so the calling agent gets a failed tool call that says what
-  happened instead of hanging until the gateway kills it.
 - **The daemon** (`stts-daemon.ts`) starts a watchdog when it accepts a request.
-  On expiry it clears the pending request and answers `504` with the reason, so
-  the caller learns the same thing and the daemon is free immediately.
+  On expiry it clears the pending request, so the daemon is free immediately. A
+  speaking request is answered `504` with the reason. A listen is not failed: it
+  is answered `__STTS_LISTEN_CONTINUES__` and the page keeps what it heard
+  (spec 012).
+- **The client** (`daemon-client.ts`) waits five seconds longer than the daemon,
+  so the daemon's answer wins; if the daemon never answers, the client destroys
+  the request and the agent gets a failed tool call instead of a hang.
+- Since spec 012 the 240 seconds are the budget of one whole tool call: a `tts`
+  and its listen share it, so the pair still returns before the gateway gives up.
 - A `res.on('close')` release sits beside the original `req.on('close')` one, for
   the cases where the socket does close. It is a bonus, not the guarantee.
 
@@ -46,19 +50,8 @@ Both the daemon and the client use `REQUEST_TIMEOUT_MS`: **240 seconds**, or
 call at about 300 seconds, and the client must give up **first**, while it is
 still alive to report the failure, leaving the daemon free either way.
 
-Two deliberate limits:
-
-- **A voice turn is bounded at four minutes.** Waiting for a person to answer is
-  unbounded by nature, so the bound is on the whole call, not on the listening
-  alone. A turn whose text needs longer than four minutes to speak should be
-  split rather than spoken in one go.
-- **The page is not told to stop.** The daemon clears the request, but the page
-  owns its own playback and its own listening state, and it only understands
-  `request` messages. Speech already playing keeps playing, "stop it" still works,
-  and anything said before the next call is dropped rather than answered, because
-  the page reports it as `complete` and no request is pending. Teaching the page a
-  `cancel` is the upgrade path; it is not needed to keep the daemon free, which is
-  what this spec is for.
+What happens to speech at the bound, and to long content, is spec 012 and
+spec 013: a listen continues instead of failing, and long text is read in parts.
 
 ## What it reads and writes
 

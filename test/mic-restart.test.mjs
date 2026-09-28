@@ -43,10 +43,11 @@ test('speech with words still arriving is not touched', () => {
   assert.equal(micVerdict(listening({ speechAt: T, resultAt: T + 8500, heardAt: T + 8500, now: T + 9000 })), null);
 });
 
-test('never outside a listen, while paused by Space, while the agent speaks, or with stop-on-silence', () => {
+test('never while the agent has the turn (tts), while paused by Space, while the agent speaks, or with stop-on-silence', () => {
   const dead = { running: false, endedAt: T, now: T + 60000, heardAt: T };
   assert.equal(micVerdict(listening({ ...dead, mode: 'tts' })), null);
-  assert.equal(micVerdict(listening({ ...dead, mode: null })), null);
+  // Spec 012: idle (agent working) is watched too, so speech between tool calls is heard.
+  assert.equal(micVerdict(listening({ ...dead, mode: null })), 'not running during a listen');
   assert.equal(micVerdict(listening({ ...dead, muted: true })), null);
   assert.equal(micVerdict(listening({ ...dead, speaking: true })), null);
   assert.equal(micVerdict(listening({ ...dead, silenceStop: true })), null);

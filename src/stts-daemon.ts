@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
-import { CONVERSATION_ENDED, NO_SPEECH } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED } from './protocol.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +23,7 @@ type RequestConfig = {
   oneshot?: boolean;
   close?: boolean;       // spec 004: close the window once this request is answered
   idleSec?: number;      // spec 010: stt only, answer NO_SPEECH after this long with nothing heard
+  timeoutMs?: number;    // spec 012: what is left of the caller's tool-call budget, capped at REQUEST_TIMEOUT_MS
 };
 
 type Pending = {
@@ -133,6 +134,9 @@ function shutdown() {
 }
 
 async function ensureChrome() {
+  // A window already connected serves the request: after a daemon restart the
+  // old window reconnects on its own, and a second one would only replace it.
+  if (!chrome && pageSocket?.readyState === WebSocket.OPEN) return;
   if (chrome) {
     if (chrome.process && !chrome.process.killed) {
       if (chrome.port && raiseOnRequest) bringWindowToFront(chrome.port);
@@ -288,14 +292,25 @@ const server = http.createServer(async (req, res) => {
     pending = entry;
     // Spec 007. The watchdog: whoever asked has gone quiet, so the request is
     // released here rather than holding the daemon until it is restarted.
+    // Spec 012. The bound is what is left of the caller's tool-call budget, so a
+    // tts followed by a listen still returns inside it. A listen is never failed
+    // at the bound: the page is told to keep what it heard (it becomes carry, then
+    // the next listen or a barge-in), and the caller is told to listen again.
+    // Failing it lost everything Mark said during a long answer (2026-09-28).
+    const bound = Math.min(Number(config.timeoutMs) || REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS);
     pendingTimer = setTimeout(() => {
       if (pending !== entry) return;
       pending = null;
       pendingTimer = null;
+      if (config.mode === 'stt') {
+        if (pageSocket?.readyState === WebSocket.OPEN) pageSocket.send(JSON.stringify({ type: 'released' }));
+        entry.respond(LISTEN_CONTINUES);
+        return;
+      }
       entry.cancel(
-        `no answer from the voice window within ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s; the request was released so the next call is not refused`
+        `no answer from the voice window within ${Math.round(bound / 1000)}s; the request was released so the next call is not refused`
       );
-    }, REQUEST_TIMEOUT_MS);
+    }, bound);
 
     const release = () => {
       if (!responded && pending === entry) {
@@ -346,6 +361,13 @@ wss.on('connection', (socket) => {
         return;
       case 'complete': {
         let text = typeof msg.text === 'string' ? msg.text : '';
+        // Spec 012. A prompt that lands with no listen pending (the listen was
+        // released at its bound a moment before) is his speech: keep it for the
+        // next listen or the barge-in hook. It used to be dropped here.
+        if (pending?.config.mode !== 'stt') {
+          if (text.trim()) barge.push(text.trim());
+          return;
+        }
         // Barge-ins nobody fetched during the turn still reach the agent.
         if (pending?.config.mode === 'stt' && barge.length) text = [barge.splice(0).join(' '), text].filter(Boolean).join(' ');
         resolvePending(text);
@@ -357,7 +379,12 @@ wss.on('connection', (socket) => {
         return;
       case 'nospeech':
         // Spec 010. Nothing heard within idleSec. Only an stt request can end this way.
-        if (pending?.config.mode === 'stt') resolvePending(NO_SPEECH);
+        // Spec 012: unless speech is already buffered from between tool calls; that is his answer.
+        if (pending?.config.mode === 'stt') resolvePending(barge.length ? barge.splice(0).join(' ') : NO_SPEECH);
+        return;
+      case 'stopped':
+        // Spec 013. He stopped the speaking turn; a reading must not go on to its next part.
+        if (pending?.config.mode === 'tts') resolvePending(STOPPED);
         return;
       case 'ended':
         // Spec 008. End conversation, said in a word the agent cannot mistake

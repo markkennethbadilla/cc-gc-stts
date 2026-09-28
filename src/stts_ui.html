@@ -1592,6 +1592,8 @@
       ws.onmessage = (ev) => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
+        // Spec 012. The daemon released a listen at its time limit; the fork script keeps what was heard.
+        if (msg.type === 'released') { if (window.onSttsReleased) window.onSttsReleased(); return; }
         if (msg.type !== 'request' || !msg.config) return;
         if (currentMode !== null) resetToIdle();
         if (msg.config.mode === 'stt') activateStt(msg.config);
@@ -1912,7 +1914,7 @@
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
-            if (this === mic) { micRunning = false; endedAt = Date.now(); }
+            if (this === mic) { micRunning = false; endedAt = Date.now(); saveIdleInterim(); }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
             // for the rest of the session. Retry with a widening delay. Spec 011: an error that
@@ -1941,6 +1943,7 @@
       // activateStt is the one place a start is wanted; mic runs from then on.
       const origActivateStt = activateStt;
       activateStt = function (config) {
+        saveIdleInterim();   // spec 012: an idle utterance Edge has not finalised yet is kept, not wiped
         prov = null; pendingInterim = '';
         origActivateStt(config);
         if (carry) { insert(carry); carry = ''; armPause(); }
@@ -1959,7 +1962,8 @@
       let micRunning = false, endedAt = 0, heardAt = Date.now(), errStreak = 0, restarts = 0;
       const micLog = (text) => sendSocket({ type: 'log', text });
       function micVerdict(s) {
-        if (s.mode !== 'stt' || s.muted || s.silenceStop || s.speaking) return null;
+        // Spec 012: while idle too, so speech between tool calls is never missed by a dead mic.
+        if (s.mode === 'tts' || s.muted || s.silenceStop || s.speaking) return null;
         if (!s.running) return s.now - s.endedAt > 6000 ? 'not running during a listen' : null;
         if (s.speechAt > s.resultAt && s.now - s.speechAt > 8000) return 'speech heard but no words for 8s';
         if (s.now - s.heardAt > 15000) return 'no audio or words for 15s during a listen';
@@ -1973,6 +1977,7 @@
         });
         if (!why) return;
         micLog(`mic restart #${++restarts}: ${why}`);
+        saveIdleInterim();
         heardAt = endedAt = Date.now(); speechStartedAt = 0;
         mic.__paused = false; mic.__fatal = false;   // a pause left by a lost speech 'end' is stale in a listen
         try { origAbort.call(mic); } catch { }
@@ -2182,7 +2187,7 @@
             if (finalText) { flushed = ''; } else { flushed = interim; flushedAt = Date.now(); }
             carry = [carry, kept || (finalText ? '' : stripCommands(interim))].filter(Boolean).join(' ');
             speakEndedAt = Date.now();
-            autoOrManualClose();
+            interruptTts();
           }
           return;
         }
@@ -2191,12 +2196,48 @@
         // If nothing fetches them, the daemon prepends them to the next stt answer.
         if (finalText) {
           clearInterim();
+          idleInterim = '';
           const kept = stripCommands(dedupe(finalText));
           if (kept) { carry = [carry, kept].filter(Boolean).join(' '); insert(kept); }
         }
-        if (interim) showInterim(interim.trim());
+        if (interim) { idleInterim = interim.trim(); showInterim(idleInterim); }
         armBarge();
       }
+      /* Spec 012. Speech between tool calls reached the agent as "Thank you." and nothing else
+         (2026-09-28): Edge held the long utterance before it as interim text, and the abort that
+         mutes the mic when the agent speaks (or a mic restart) drops interim audio for good. So
+         the latest idle interim is moved into carry before anything can discard it: on every
+         recognizer end, before every abort, and when a listen starts. A final that lands later
+         is deduped against it. */
+      let idleInterim = '';
+      function saveIdleInterim() {
+        if (!idleInterim) return;
+        const kept = stripCommands(idleInterim);
+        flushed = idleInterim; flushedAt = Date.now(); idleInterim = '';
+        if (kept) { carry = [carry, kept].filter(Boolean).join(' '); prov = null; armBarge(); }
+      }
+      /* Spec 012. A listen the daemon released at its time limit (the tool call has to return
+         before the gateway gives up) used to strand what Mark was saying: the page kept it, sent
+         it later to a daemon with nothing pending, and it was dropped. Now it becomes carry, the
+         same as speech heard while idle, so the next listen starts with it or, if none comes,
+         it reaches the agent as a barge-in after his pause. */
+      window.onSttsReleased = function () {
+        if (currentMode !== 'stt') return;
+        clearTimeout(pauseTimer); clearTimeout(idleTimer);
+        flushInterim();
+        const said = input.value.trim();
+        resetToIdle();
+        if (said) { carry = [carry, said].filter(Boolean).join(' '); armBarge(); }
+      };
+      /* Spec 013. "stop it", the stop button, and talking over the agent (headphone mode) end the
+         speaking turn and say so, so a long reading stops for good instead of going on to its next
+         part, and a tts with listen goes straight to listening instead of waiting out the time limit. */
+      function interruptTts() {
+        synth.cancel(); gotitBtn.disabled = true;
+        sendSocket({ type: 'stopped' });
+        resetToIdle();
+      }
+      stopBtn.onclick = () => { const live = currentMode === 'tts'; stopSpeaking(); if (live) interruptTts(); };
       function armBarge() {
         if (muted) return;   // paused: hold the countdown, resume rearms it
         if (carry && !micSpeaking()) {
@@ -2232,6 +2273,7 @@
          __paused and does not auto-restart in between. */
       const muteMic = () => {
         if (bargeIn.checked || !mic || !mic.__wanted || mic.__paused) return;
+        saveIdleInterim();
         mic.__paused = true;
         try { origAbort.call(mic); } catch { }
       };

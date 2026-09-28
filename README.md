@@ -27,7 +27,7 @@ Talk to **Claude Code**, **Gemini CLI** or **Antigravity CLI aka agy** and hear 
 2.  **Daemon:** A local HTTP + WebSocket server on port `15986` that controls a Chrome instance in "app mode". Stores its profile under `$TMPDIR/cc-gc-stts-user-data-dir`.
 3.  **Browser UI ↔ Daemon:** A single persistent **WebSocket** at `/ws` carries every per-turn message. The daemon pushes a `request` frame the moment the model calls `stt` or `tts`; the page pushes back `complete` / `cancel` / `close` when the user is done.
 4.  **Browser UI:** Uses the native **Web Speech API** for recognition and synthesis. Free at the wallet — note that on Linux Chrome routes recognition audio through Google's servers, so this is not a fully offline pipeline.
-5.  **Smart Auto-Advance:** In the `/stts` voice loop, if you simply listen through the response without touching anything, the loop advances automatically the moment speech ends. Only if you press **Stop** or **Play** (or say "stop it" / "play it") does the page wait for a manual **Got it!** so you stay in control of replays.
+5.  **Smart Auto-Advance:** In the `/stts` voice loop, if you simply listen through the response without touching anything, the loop advances automatically the moment speech ends. Pressing **Stop** (or saying "stop it") ends the speaking turn at once, which also stops a long reading (spec 013); pressing **Play** (or saying "play it") replays and waits for a manual **Got it!**.
 6.  **Automatic Lifecycle:** The daemon starts on demand and shuts down when the Chrome window is closed.
 7.  **Port-collision aware:** If port `15986` is held by a non-stts process, the launcher fails fast with a clear error instead of timing out.
 

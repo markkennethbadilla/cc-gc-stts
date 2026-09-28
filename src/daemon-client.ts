@@ -7,7 +7,8 @@ import fs from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const FIXED_PORT = 15986;
+// STTS_PORT: a test runs a daemon and a server of its own (spec 008, 012).
+export const FIXED_PORT = Number(process.env.STTS_PORT) || 15986;
 
 // A request the caller abandons must not keep the daemon. The daemon holds one
 // pending request at a time and frees it when this client closes the connection
@@ -18,7 +19,13 @@ export const FIXED_PORT = 15986;
 // counting. This bound is therefore set by the gateway's ceiling, not by taste:
 // it has to fire first. A voice turn that needs longer than this is a turn whose
 // text should be split. STTS_REQUEST_TIMEOUT_MS overrides it for a live check.
+// Spec 012: it is the budget of one whole tool call (a tts and its listen share it),
+// and a listen that reaches it is answered LISTEN_CONTINUES, never failed.
 export const REQUEST_TIMEOUT_MS = Number(process.env.STTS_REQUEST_TIMEOUT_MS) || 240_000;
+
+// Spec 012. The daemon answers at the request's timeoutMs; the client waits this
+// much longer, so the daemon's answer wins the race instead of a failed tool call.
+export const CLIENT_MARGIN_MS = 5_000;
 
 export interface SttConfig {
   title: string;
@@ -26,6 +33,7 @@ export interface SttConfig {
   initialText: string;
   startRecording: boolean;
   idleSec?: number;
+  timeoutMs?: number;
 }
 
 export interface TtsConfig {
@@ -34,6 +42,7 @@ export interface TtsConfig {
   text: string;
   oneshot: boolean;
   close?: boolean;
+  timeoutMs?: number;
 }
 
 type PingResult = 'ours' | 'foreign' | 'closed';
@@ -208,7 +217,8 @@ const DAEMON_GONE = new Set(['ECONNRESET', 'ECONNREFUSED', 'EPIPE']);
 
 export async function sendWithRetry(
   body: object,
-  send: (b: object) => Promise<string> = postRequest,
+  send: (b: object) => Promise<string> = (b) =>
+    postRequest(b, FIXED_PORT, (Number((b as { timeoutMs?: number }).timeoutMs) || REQUEST_TIMEOUT_MS) + CLIENT_MARGIN_MS),
   ensure: () => Promise<void> = ensureDaemon
 ): Promise<string> {
   await ensure();
@@ -225,6 +235,6 @@ export async function launchStt(config: SttConfig): Promise<string> {
   return sendWithRetry({ mode: 'stt', ...config });
 }
 
-export async function launchTts(config: TtsConfig): Promise<void> {
-  await sendWithRetry({ mode: 'tts', ...config });
+export async function launchTts(config: TtsConfig): Promise<string> {
+  return sendWithRetry({ mode: 'tts', ...config });
 }
