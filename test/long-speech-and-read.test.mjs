@@ -92,6 +92,27 @@ test('stress: 2000 utterances between tool calls all arrive, in order', async ()
   assert.equal(got.text, words.join(' '));
 });
 
+// Spec 018. Words said between tool calls reach the voice-loop agent exactly once:
+// a background subagent's or another session's hook no longer takes them.
+test('only the voice owner takes speech said between calls, three rounds', async () => {
+  const barge = async (q) => (await (await fetch(`http://127.0.0.1:${PORT}/barge?${q}`)).json()).text;
+  for (let k = 0; k < 3; k++) {
+    assert.equal(await barge('who=main|&owner=1'), '');          // the loop agent's stt call claims the voice
+    send({ type: 'barge', text: `how do they sign in ${k}` });
+    await wait(50);
+    assert.equal(await barge('who=main|sub1'), '');               // its background subagent: nothing
+    assert.equal(await barge('who=other-session|'), '');          // another session: nothing
+    assert.equal(await barge('who=main|'), `how do they sign in ${k}`); // the loop agent: all of it
+    assert.equal(await barge('who=main|'), '');                   // once
+    send({ type: 'barge', text: `then this ${k}` });
+    await wait(50);
+    assert.equal(await barge('who=main|sub1'), '');
+    page.onRequest = (m) => { if (m.type === 'request') send({ type: 'nospeech' }); };
+    assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, `then this ${k}`); // or the next listen
+    page.onRequest = () => {};
+  }
+});
+
 test('stop during tts answers STOPPED', async () => {
   page.onRequest = (m) => { if (m.type === 'request') send({ type: 'stopped' }); };
   assert.equal((await post({ mode: 'tts', text: 'x', timeoutMs: 2000 })).body.text, STOPPED);

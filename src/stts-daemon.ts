@@ -203,6 +203,7 @@ function deliverToPage() {
 // request raises the window; the page sends its settings on connect and on
 // change.
 const barge: string[] = [];
+let voiceOwner = ''; // spec 018: session|agent of the agent in the voice loop
 let raiseOnRequest = false;
 
 // Spec 004. The window closes when the conversation is over: the last tts of a
@@ -245,7 +246,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/barge') {
-    const text = barge.splice(0).join(' ');
+    // Spec 018. The hook runs before EVERY agent's tool calls, background
+    // subagents and other sessions included, and each fetch used to take the
+    // words. So the agent whose hook fires on an stt/tts call (`owner=1`) owns
+    // the voice, and only it (`who` equal to the owner) takes them; anyone else
+    // gets nothing and the words wait. A caller with no `who` (an older hook)
+    // still takes them, as before.
+    const who = url.searchParams.get('who') || '';
+    if (who && url.searchParams.get('owner') === '1') voiceOwner = who;
+    const mine = !who || !voiceOwner || who === voiceOwner;
+    const text = mine ? barge.splice(0).join(' ') : '';
     // Spec 015. open: the voice window is connected, so a voice loop is live.
     // The house hook refuses a sleep while it is, so Mark never talks to a dead agent.
     const open = pageSocket?.readyState === WebSocket.OPEN;
