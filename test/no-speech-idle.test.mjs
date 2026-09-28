@@ -95,7 +95,9 @@ test('the daemon answers nospeech with the marker, for stt only', () => {
 test('the marker is ASCII, unmistakable, and not the end marker', () => {
   assert.match(NO_SPEECH, /^__[A-Z_]+__$/);
   assert.notEqual(NO_SPEECH, CONVERSATION_ENDED);
-  assert.ok(DEFAULT_IDLE_SEC >= 10 && DEFAULT_IDLE_SEC <= 60);
+  // Spec 017: the schema maximum, and still inside the 240 s call budget.
+  assert.equal(DEFAULT_IDLE_SEC, 200);
+  assert.ok(DEFAULT_IDLE_SEC * 1000 < 240_000);
 });
 
 test('both tools pass idleSec and explain the marker', () => {

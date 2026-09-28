@@ -53,8 +53,9 @@ const listenFor = (idle: number | undefined, timeoutMs: number) =>
 // Spec 015. Waiting for him is itself a listen: a sleep or any other blocking
 // tool leaves him talking to an agent that cannot answer until it returns.
 const NO_SLEEP_NOTE =
-  ' Never sleep or block on another tool to wait for him: to wait, call stt again with a long ' +
-  'idleSec (up to 200), so you answer the moment he stops talking.';
+  ' Never sleep or block on another tool to wait for him: to wait, call stt again (the default ' +
+  `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
+  'Pass a short idleSec (about 20) only while a background result you promised him is due.';
 
 const reply = (...texts: string[]) => ({ content: texts.map((text) => ({ type: 'text' as const, text })) });
 

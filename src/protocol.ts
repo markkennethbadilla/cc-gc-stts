@@ -11,9 +11,12 @@ export const CONVERSATION_ENDED = '__STTS_CONVERSATION_ENDED__';
 // on a silent room. It is not an end: the window stays open and listening.
 export const NO_SPEECH = '__STTS_NO_SPEECH__';
 
-// Spec 010. Long enough for a thinking pause before he starts talking, short
-// enough that a finished background result is relayed within a turn.
-export const DEFAULT_IDLE_SEC = 20;
+// Spec 017. The longest listen the tool schema allows (max 200), under the 240 s
+// call budget. Every empty return is a full model round trip over the whole
+// context, so a short default (it was 20) burned tokens on a silent room, and an
+// agent with a stale schema cannot pass a longer one. An agent waiting on a
+// background result it promised passes a short idleSec itself.
+export const DEFAULT_IDLE_SEC = 200;
 
 // Spec 012. A listen reached the tool call's time limit (the client has to return
 // before the gateway gives up). Nothing he said is lost: the window keeps it, and

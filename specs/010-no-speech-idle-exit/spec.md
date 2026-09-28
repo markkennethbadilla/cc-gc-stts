@@ -2,8 +2,8 @@
 
 ## What it does
 
-When the voice window is listening and Mark says nothing for a while (20 seconds
-by default), the listen ends on its own and the agent receives the marker
+When the voice window is listening and Mark says nothing for a while (200 seconds
+by default since spec 017), the listen ends on its own and the agent receives the marker
 `__STTS_NO_SPEECH__`. The window stays open and the microphone stays on. The
 agent then either tells him a result that has come in, or quietly listens again.
 
@@ -18,8 +18,9 @@ On 2026-09-28 that was 181 seconds of silence, and it looked like a freeze.
 ## How it works
 
 - **The tools** (`stts-mcp-server.ts`) take an optional `idleSec`: on `stt`, and
-  on `tts` when `listen` is true. It defaults to 20 (`DEFAULT_IDLE_SEC` in
-  `src/protocol.ts`). `0` waits for him, as before. Both tool descriptions say
+  on `tts` when `listen` is true. It defaults to 200 (`DEFAULT_IDLE_SEC` in
+  `src/protocol.ts`, spec 017); an agent waiting on a background result passes
+  a short value itself. `0` waits for him, as before. Both tool descriptions say
   what the marker means, so every agent reads it every session.
 - **The page** (`stts_ui.html`, `armIdle`) starts a timer when a listen begins.
   When it fires, if nothing is typed or heard, it sends `{ type: 'nospeech' }` and
@@ -54,7 +55,7 @@ it; speaking at the deadline delays it without cutting him off; `0` or no value
 waits as before; a turn that already ended sends nothing. It also checks the
 daemon branch, the marker's shape, and that both tools pass `idleSec`.
 
-Live check, for Mark: start `/stts`, say nothing for 20 seconds. The agent should
+Live check, for Mark: start `/stts`, say nothing for 200 seconds. The agent should
 get its turn back, then listen again without speaking. Speak after that and the
 next listen hears it.
 
