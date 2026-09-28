@@ -27,7 +27,6 @@ export const LISTEN_CONTINUES = '__STTS_LISTEN_CONTINUES__';
 export const STOPPED = '__STTS_STOPPED__';
 
 // Spec 016. He talked while the agent was speaking (headphone mode). The page
-// controls nothing on his words: the voice keeps playing, and the tts call
-// returns at once with this marker, a space, and what he said, so the agent
-// decides whether it was meant for it.
+// stops the voice at once, and the tts call returns with this marker, a space,
+// and what he said, so the agent answers it or resumes from the part it names.
 export const HEARD = '__STTS_HEARD__';

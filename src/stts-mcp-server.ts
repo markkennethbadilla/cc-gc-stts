@@ -84,9 +84,9 @@ server.registerTool(
       'markdown, not an HTML page) instead of copying it into text: the server reads and speaks it, so ' +
       'you do not spend output on it. Markdown files are read without their markup. Long content is ' +
       'read in parts; if the call returns before the end, it says which part to pass next. The Stop ' +
-      'button stops the reading and it says where. Nothing he says controls the window: if he talks ' +
-      'over you, the call returns at once with his words while your voice keeps playing, and you ' +
-      'decide. Meant for you: answer (your next stts call cuts the playback). Not for you (a TV, ' +
+      'button stops the reading and it says where. No spoken word is a command, but if he talks ' +
+      'over you, your voice stops at once and the call returns with his words and the part it ' +
+      'stopped at, and you decide. Meant for you: answer. Not for you (a TV, ' +
       'someone else): call tts again to go on from where it names. With listen=true it then opens ' +
       'speech-to-text at once and returns what the user said next, saving a round trip per turn.' +
       ENDED_NOTE +
@@ -139,8 +139,8 @@ server.registerTool(
     if (over !== null) {
       const goOn = n > 1 ? `call tts with ${where} and part=${i + 1}` : 'say it again, or the rest of it, with tts';
       return reply(
-        `He spoke while you were speaking: "${over}". Your voice is still playing until your next stts call. ` +
-          `If it was meant for you, answer it with tts (listen=true); that cuts the playback. ` +
+        `He spoke while you were speaking: "${over}". Your voice stopped${n > 1 ? ` during part ${i + 1} of ${n}` : ''}. ` +
+          `If it was meant for you, answer it with tts (listen=true). ` +
           `If it was not (a TV, someone else in the room), ${goOn}.`
       );
     }

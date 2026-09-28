@@ -198,7 +198,7 @@ test('tts: a long answer plus its listen still returns inside the budget', async
   assert.ok(Date.now() - t < BUDGET + 500, `took ${Date.now() - t}ms`);
 });
 
-// Spec 016. Words over the agent's voice return the call at once; nothing is stopped for him.
+// Spec 016. Words over the agent's voice stop it and return the call at once.
 test('tts: talking over it returns his words at once, three times over', async () => {
   page.got = [];
   for (let k = 0; k < 3; k++) {
@@ -207,6 +207,7 @@ test('tts: talking over it returns his words at once, three times over', async (
     const out = await call({ text: 'a long answer', listen: true });
     assert.ok(Date.now() - t < 1000, `took ${Date.now() - t}ms`);
     assert.match(out[0], new RegExp(`He spoke while you were speaking: "is that the TV ${k}"`));
+    assert.match(out[0], /Your voice stopped\. /);
     assert.match(out[0], /say it again/);
     assert.equal(page.got.filter((m) => m.type === 'request' && m.config.mode === 'stt').length, 0, 'no listen after');
     page.got = [];
@@ -222,7 +223,7 @@ test('tts file: talking over part 2 names part 2 to go on from', async () => {
   };
   const out = await call({ file: bookFile() });
   assert.equal(n, 2);
-  assert.match(out[0], /"hang on".*part=2/);
+  assert.match(out[0], /"hang on".*Your voice stopped during part 2 of \d+\..*part=2/);
 });
 
 test('heard with nothing pending is kept for the next listen; empty heard is ignored', async () => {

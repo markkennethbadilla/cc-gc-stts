@@ -85,8 +85,8 @@ test('the daemon side and the page side agree on the message names', () => {
   assert.match(daemon, /type: 'released'/);
   assert.match(src[0], /sendSocket\(\{ type: 'stopped' \}\)/);
   assert.match(daemon, /case 'stopped':/);
-  // Spec 016: talking over it hands his words to the agent and stops nothing.
-  assert.match(html, /if \(heard\) sendSocket\(\{ type: 'heard', text: heard \}\);/);
+  // Spec 016: talking over it hands his words to the agent, then stops the voice at once.
+  assert.match(html, /if \(heard\) \{ sendSocket\(\{ type: 'heard', text: heard \}\); stopSpeaking\(\); gotitBtn\.disabled = true; resetToIdle\(\); \}/);
   assert.match(daemon, /case 'heard':/);
 });
 

@@ -1935,7 +1935,7 @@
       // after, is the agent's own voice coming back through the mic.
       // Judged on content words only, and a third of them may be misheard. Fewer than two
       // content words is not enough evidence either way, so it waits for more.
-      const STOP = new Set('a an the i you it to of and or is are was be do so that this in on at for with me my your we they he she not no yes ok okay um uh'.split(' '));
+      const STOP = new Set('a an the i you it to of and or is are was be do so that this in on at for with me my your we they he she not no yes ok okay um uh yeah mm hmm mhm huh right'.split(' '));
       const content = (s) => norm(s).filter(w => !STOP.has(w));
       /* The Talk panel had no echo test at all: after speaking with listen on, the mode is stt,
          so a late transcript of the agent's own voice went straight into the prompt and was sent
@@ -2052,11 +2052,13 @@
         const text = finalText || interim;
         if (isEcho(text)) return;
         if (currentMode === 'tts') {
-          /* Spec 016. Talking over the agent controls nothing: the voice keeps playing and his
-             words go to the agent at once, which decides whether they were meant for it. */
+          /* Spec 016. Talking over the agent stops the voice at once (Mark 2026-09-29) and his
+             words go to the agent, which answers them or resumes from the part it names.
+             isEcho above already let through only two or more content words that are not the
+             agent's own text. Heard is sent before the stop so the stop cannot end the tts first. */
           if (bargeIn.checked && finalText) {
             const heard = dedupe(finalText).trim();
-            if (heard) sendSocket({ type: 'heard', text: heard });
+            if (heard) { sendSocket({ type: 'heard', text: heard }); stopSpeaking(); gotitBtn.disabled = true; resetToIdle(); }
           }
           return;
         }
