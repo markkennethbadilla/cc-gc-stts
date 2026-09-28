@@ -53,6 +53,12 @@ being lost.
 - **Settings gear.** Voice, speaking rate 0.5x to 2x, auto-send and
   its pause, stop-on-silence, barge-in, all behind one button at the
   left of the end bar. Theme (system, light, dark) at the right.
+- **Theme is not overridden by Dark Reader.** The page carries
+  `<meta name="darkreader-lock">`, Dark Reader's own opt-out, so the
+  extension leaves the window alone and the chosen theme is what shows.
+  Mark runs Dark Reader in Edge and it was darkening the window even on
+  light. Parity with the callbot (rule 67): no counterpart, because the
+  callbot has no page Mark views; a channel difference, not a gap.
 - **Readable inactive panel.** The panel that is not active stays
   scrollable and selectable but read-only. Tab never moves focus out
   of the prompt box; a click on empty chrome never takes focus away.
