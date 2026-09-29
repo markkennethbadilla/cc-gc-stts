@@ -47,6 +47,7 @@ package `sentence-splitter` 5.0.1 both cut "Mr. Smith" or a URL at its `?`
 | Where speech is cut | `clauses()`, every punctuation mark | The same `clauses()` code | Same |
 | How a piece is played | One browser utterance per piece | One rendered clip per piece; a piece over 300 characters is cut at a word | Channel: the call bot renders audio on the server and a long clip takes seconds to render |
 | Resuming a long read | By 1000-character part | By piece | Channel: the call bot plays and counts clips; stts sends parts to the window |
+| Agent guidance on how to phrase a spoken reply | None added; the voice is near instant | `call_say` asks for short phrases; any punctuation is fine because every mark cuts a clip | Channel: the call bot has high latency, stts does not (Mark 2026-09-30) |
 
 ## What it reads and writes
 
