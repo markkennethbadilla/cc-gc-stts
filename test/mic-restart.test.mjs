@@ -61,9 +61,9 @@ test('the watchdog clears a stale speech pause and logs every restart', () => {
   assert.match(wd[0], /mic\.start\(\)/);
 });
 
-test('recognizer errors are logged and widen the end-hook restart delay, capped at 5 s', () => {
-  assert.match(html, /e\.error !== 'aborted'\) \{ errStreak\+\+; micLog\(/);
-  assert.match(html, /retry\(Math\.min\(100 \* 2 \*\* errStreak, 5000\)\)/);
+test('recognizer errors are logged; only errors under 10 s apart widen the restart delay (spec 019)', () => {
+  assert.match(html, /e\.error !== 'aborted'\) \{ errStreak = Date\.now\(\) - lastErrAt < 10000 \? errStreak \+ 1 : 1; lastErrAt = Date\.now\(\); micLog\(/);
+  assert.match(html, /retry\(restartDelay\(errStreak\)\)/);
   assert.match(html, /lastResultAt = heardAt = Date\.now\(\); errStreak = 0;/);
 });
 

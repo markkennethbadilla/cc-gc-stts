@@ -33,7 +33,7 @@ with no event, it clears any fatal flag, aborts the recognizer and starts it
 again 300 milliseconds later.
 
 The `end` handler now retries a failed start at 100, 200, 400 milliseconds
-and so on up to 5 seconds, instead of giving up on the first throw.
+and so on up to 2 seconds (spec 019), instead of giving up on the first throw.
 
 The watchdog does nothing when "stop listening on silence" is switched on,
 because stopping is what the user asked for there.

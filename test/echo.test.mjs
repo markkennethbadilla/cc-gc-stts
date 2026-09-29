@@ -80,7 +80,7 @@ test('a long reply with no overlap is kept', () => {
 // Spec 016. Talking over the voice stops it only when isEcho lets the words through:
 // two or more content words that are not the agent's own text. Backchannels do not.
 const echoSrc = [grab(/const STOP = new Set\([^;]+;/, 'STOP'), grab(/const norm = \(s\) =>[^;]+;/, 'norm'),
-  grab(/const content = \(s\) =>[^;]+;/, 'content'), grab(/function isEcho\(text\) \{[\s\S]*?\n {6}\}/, 'isEcho')].join('\n');
+  grab(/const content = \(s\) =>[^;]+;/, 'content'), grab(/function ownVoice\(text\) \{[\s\S]*?\n {6}\}/, 'ownVoice'), grab(/function isEcho\(text\) \{[\s\S]*?\n {6}\}/, 'isEcho')].join('\n');
 const talkOverStops = (text) => !new Function('synth', 'ttsTextarea', 'speakEndedAt', 'Date', 'bargeIn', `${echoSrc}\nreturn isEcho;`)(
   { speaking: true }, { value: agentLine }, 0, { now: () => 0 }, { checked: true })(text);
 

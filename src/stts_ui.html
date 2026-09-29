@@ -1524,6 +1524,16 @@
         const legacy = localStorage.getItem(LS_BARGE_IN);
         if (legacy !== null) localStorage.setItem(LS_HEADPHONE_MODE, legacy);
       }
+      /* Spec 019. A 2 s auto-send split sentences at every thinking pause (Mark 2026-09-30). The
+         default is 3.5 s, and a saved 2 s (the old default, never a choice) moves with it once. A
+         value Mark sets later, 2 s included, is left alone: the marker makes this run one time. */
+      const PAUSE_DEFAULT_MS = 3500;
+      function migratePause(ls) {
+        if (ls.getItem('__stts__autosend_ms_v2') !== null) return;
+        if (ls.getItem(LS_AUTOSEND_MS) === '2000') ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
+        ls.setItem('__stts__autosend_ms_v2', '1');
+      }
+      migratePause(localStorage);
       // The reverted PWA build left a service worker registered in the profile; it would keep
       // serving the page it cached over any newer build. Drop it.
       if (navigator.serviceWorker) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
@@ -1712,9 +1722,9 @@
         LS_AUTOSEND, true);
       const autoOn = auto.box;
       const autoSec = auto.bar.querySelector('#autosend-sec');
-      const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || 2000;
+      const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || PAUSE_DEFAULT_MS;
       autoSec.value = pauseMs() / 1000;
-      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || 2000)));
+      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || PAUSE_DEFAULT_MS)));
       const stopOnSilence = checkbox(sttContainer, 'Silence', 'stop-on-silence', 'stop listening on silence', LS_STOP_ON_SILENCE, false).box;
       const bargeIn = checkbox(ttsContainer, 'Headphone mode', 'barge-in', 'mic stays open while the agent speaks; talk over it to interrupt', LS_HEADPHONE_MODE, false).box;
       /* Spec 003: bring-to-front on every request stole focus from whatever Mark was typing.
@@ -1770,7 +1780,7 @@
           this.addEventListener('error', (e) => {
             if (FATAL.has(e.error)) this.__fatal = true;
             // 'aborted' is our own abort (speakers mute, pause, restart); anything else is news.
-            if (this === mic && e.error !== 'aborted') { errStreak++; micLog('recognizer error ' + e.error); }
+            if (this === mic && e.error !== 'aborted') { errStreak = Date.now() - lastErrAt < 10000 ? errStreak + 1 : 1; lastErrAt = Date.now(); micLog('recognizer error ' + e.error); }
           });
           this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); if (this === mic) micRunning = true; });
           this.addEventListener('audiostart', () => { if (this === mic) heardAt = Date.now(); });
@@ -1788,13 +1798,12 @@
             if (this === mic) { micRunning = false; endedAt = Date.now(); saveIdleInterim(); }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
-            // for the rest of the session. Retry with a widening delay. Spec 011: an error that
-            // ends every session (network) widens the first delay too, capped at 5 s.
+            // for the rest of the session. Retry with a widening delay, capped at 2 s.
             const retry = (delay) => setTimeout(() => {
               if (!this.__wanted || this.__fatal || this.__paused) return;
-              try { origStart.call(this); } catch { if (delay < 5000) retry(Math.min(delay * 2, 5000)); }
+              try { origStart.call(this); } catch { if (delay < 2000) retry(Math.min(Math.max(delay * 2, 100), 2000)); }
             }, delay);
-            retry(Math.min(100 * 2 ** errStreak, 5000));
+            retry(restartDelay(errStreak));
           });
         }
         this.__wanted = true; this.__fatal = false;
@@ -1830,7 +1839,11 @@
          pending, check every 2 s and restart the recognizer if it is not running, if it heard
          speech but wrote no words for 8 s, or if it has had no audio and no words for 15 s.
          Every restart and every recognizer error goes to daemon.log. */
-      let micRunning = false, endedAt = 0, heardAt = Date.now(), errStreak = 0, restarts = 0;
+      let micRunning = false, endedAt = 0, heardAt = Date.now(), errStreak = 0, lastErrAt = 0, restarts = 0;
+      /* Spec 019. Edge ends a session with error 'network' about once a minute even in silence, so
+         the streak climbed all day and each restart waited up to 5 s, deaf, while Mark talked. Now
+         a recognizer that ended restarts at once; only errors less than 10 s apart widen the wait. */
+      function restartDelay(n) { return n <= 1 ? 0 : Math.min(250 * 2 ** (n - 2), 2000); }
       const micLog = (text) => sendSocket({ type: 'log', text });
       function micVerdict(s) {
         // Spec 012: while idle too, so speech between tool calls is never missed by a dead mic.
@@ -1951,14 +1964,21 @@
         if (words.length < 4) return false;
         return words.filter(w => !spoken.has(w)).length / words.length <= 0.25;
       }
-      function isEcho(text) {
+      /* Spec 019. Only the agent's own voice is thrown away: words that are nearly all from what
+         it is saying, heard while it speaks or just after. Anything else is Mark and is kept. */
+      function ownVoice(text) {
         if (!synth.speaking && Date.now() - speakEndedAt > 1500) return false;
         if (!bargeIn.checked) return true;   // speakers: anything heard while speaking is the agent
         const spoken = new Set(norm(ttsTextarea.value));
-        const words = content(text);
-        if (words.length < 2) return true;
-        const unmatched = words.filter(w => !spoken.has(w)).length;
-        return unmatched / words.length <= 0.34;
+        const words = content(text).length ? content(text) : norm(text);
+        if (!words.length) return true;
+        return words.filter(w => !spoken.has(w)).length / words.length <= 0.34;
+      }
+      // Can this stop the voice? Not its own voice, and two or more content words: a lone
+      // "yeah" or "stop" is kept for the next prompt but does not cut the agent off.
+      function isEcho(text) {
+        if (!synth.speaking && Date.now() - speakEndedAt > 1500) return false;
+        return ownVoice(text) || content(text).length < 2;
       }
       // Drop the part of a final that was already sent from its interim.
       function dedupe(text) {
@@ -2050,16 +2070,24 @@
           return;
         }
         const text = finalText || interim;
-        if (isEcho(text)) return;
+        if (ownVoice(text)) return;
         if (currentMode === 'tts') {
           /* Spec 016. Talking over the agent stops the voice at once (Mark 2026-09-29) and his
              words go to the agent, which answers them or resumes from the part it names.
              isEcho above already let through only two or more content words that are not the
              agent's own text. Heard is sent before the stop so the stop cannot end the tts first. */
-          if (bargeIn.checked && finalText) {
+          if (bargeIn.checked && finalText && !isEcho(finalText)) {
             const heard = dedupe(finalText).trim();
-            if (heard) { sendSocket({ type: 'heard', text: heard }); stopSpeaking(); gotitBtn.disabled = true; resetToIdle(); }
+            if (heard) { idleInterim = ''; sendSocket({ type: 'heard', text: heard }); stopSpeaking(); gotitBtn.disabled = true; resetToIdle(); return; }
           }
+          /* Spec 019. Anything else heard during the agent's turn used to be dropped: an interim
+             that never finalised, a short final, speech after the voice ended. It is carried into
+             the next prompt, or reaches the agent as a barge-in after his pause once idle. */
+          if (finalText) {
+            idleInterim = '';
+            const kept = stripCommands(dedupe(finalText));
+            if (kept) carry = [carry, kept].filter(Boolean).join(' ');
+          } else if (interim) idleInterim = interim.trim();
           return;
         }
         // idle: the agent is working. Keep finals, and after Mark's pause hand them to the
@@ -2126,6 +2154,7 @@
       const origResetToIdle = resetToIdle;
       resetToIdle = function () {
         origResetToIdle();
+        armBarge();   // spec 019: speech kept during the agent's turn goes out after his pause
         sttPanel.classList.remove('inactive');
         sttLabel.classList.add('active');
         dictateBtn.style.opacity = '1'; dictateBtn.style.pointerEvents = 'auto';

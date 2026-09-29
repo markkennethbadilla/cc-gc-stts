@@ -43,9 +43,9 @@ for the agent's next call left the voice talking over him.
 - `extractCommands` (Talk) returns the text unchanged; `extractTtsCommands`
   (Listen) returns no effects. The command regexes, the spec 003 additions and
   the idle "repeat" path are deleted, and the cheat-sheet buttons are hidden.
-- Headphone mode, while the agent speaks: `isEcho` drops a final with fewer
-  than two content words, or one mostly made of the spoken text. Any other
-  final is sent as `{ type: 'heard', text }`, then `stopSpeaking()` and
+- Headphone mode, while the agent speaks: `ownVoice` drops text mostly made of
+  the spoken text; a final with fewer than two content words does not stop the
+  voice and is kept for the next prompt (spec 019). Any other final is sent as `{ type: 'heard', text }`, then `stopSpeaking()` and
   `resetToIdle()` run, the same as a Stop press minus the `stopped` message.
   `heard` goes first so the daemon returns the words, not a plain stop.
 - The daemon resolves a pending `tts` with `__STTS_HEARD__ <text>`; with nothing
@@ -63,7 +63,7 @@ for the agent's next call left the voice talking over him.
 | Spoken commands | None | None | Same |
 | Someone talks over the voice | Stops at once; `tts` returns his words and the part to resume at | Stops at once; the words come back on the listen the agent holds, with the part to resume at | `call_say` returns after part 1, so that agent is already listening |
 | What counts | Two or more content words, not an echo | The same list and bar | Same |
-| Short line ("yeah", one word) | Treated as echo, dropped | Kept, reaches the agent, she keeps talking | Nothing said in a meeting is dropped (callbot spec 003) |
+| Short line ("yeah", one word) | Kept for the next prompt, the voice keeps talking (spec 019) | Kept, reaches the agent, she keeps talking | Same outcome; stts has no listen open during its own voice |
 | Stop | Stop button, or the agent's next call | `call_say` `stop: true` | No page button in a meeting |
 
 ## What it reads and writes

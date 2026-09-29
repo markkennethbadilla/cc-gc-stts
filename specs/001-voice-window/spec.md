@@ -38,7 +38,7 @@ being lost.
   one recognizer and restarts it whenever Edge ends it. Speech heard
   while the agent is thinking or talking is carried into the next
   prompt.
-- **Auto-send after a pause.** On by default, 2 seconds. Counts from
+- **Auto-send after a pause.** On by default, 3.5 seconds (spec 019). Counts from
   the last interim result, so a sentence still being recognised is
   never cut. Turn it off to dictate long prompts.
 - **Live interim text.** The prompt box shows Edge's interim transcript

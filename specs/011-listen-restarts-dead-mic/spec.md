@@ -42,9 +42,9 @@ All in `src/stts_ui.html`, inside the one-microphone block.
 - A restart clears a leftover "agent is speaking" pause, aborts the
   recognizer and starts it again 300 milliseconds later.
 - When an error keeps ending the recognizer (for example `network`), the
-  normal restart after `end` now waits longer each time, 100 ms doubling up to
-  5 seconds, instead of retrying every 100 ms. The first word it writes resets
-  that.
+  normal restart after `end` restarts at once, and waits longer only when
+  errors come less than 10 s apart, up to 2 seconds (spec 019). The first word
+  it writes resets that.
 - The microphone icon and "Listening" state already follow the recognizer's
   own `start` and `end` events, so once it is restarted they are accurate
   again.
