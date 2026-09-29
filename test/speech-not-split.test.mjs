@@ -15,20 +15,22 @@ const store = (init) => {
 };
 const migrate = (ls) => new Function('LS_AUTOSEND_MS', `${migrateSrc}\nmigratePause(arguments[1]); return PAUSE_DEFAULT_MS;`)('__stts__autosend_ms', ls);
 
-test('default pause is 3.5 s and the page falls back to it', () => {
-  assert.equal(migrate(store({})), 3500);
+test('default pause is 1 s and the page falls back to it', () => {
+  assert.equal(migrate(store({})), 1000);
   assert.match(html, /const pauseMs = \(\) => Number\(localStorage\.getItem\(LS_AUTOSEND_MS\)\) \|\| PAUSE_DEFAULT_MS;/);
 });
 
-test('a saved old default of 2 s moves to 3.5 s once; any other value, and later choices, stay', () => {
+test('a saved old default of 3.5 s or 2 s moves to 1 s once; any other value, and later choices, stay', () => {
   for (let round = 0; round < 3; round++) {
-    const old = store({ __stts__autosend_ms: '2000' });
-    migrate(old);
-    assert.equal(old.getItem('__stts__autosend_ms'), '3500');
-    old.setItem('__stts__autosend_ms', '2000');   // Mark picks 2 s again on purpose
-    migrate(old);
-    assert.equal(old.getItem('__stts__autosend_ms'), '2000');
-    for (const v of ['1500', '2500', '4000', '300']) {
+    for (const oldDefault of ['3500', '2000']) {
+      const old = store({ __stts__autosend_ms: oldDefault, __stts__autosend_ms_v2: '1' });   // v2 already ran
+      migrate(old);
+      assert.equal(old.getItem('__stts__autosend_ms'), '1000');
+      old.setItem('__stts__autosend_ms', oldDefault);   // Mark picks it again on purpose
+      migrate(old);
+      assert.equal(old.getItem('__stts__autosend_ms'), oldDefault);
+    }
+    for (const v of ['1500', '2500', '4000', '300', '1000']) {
       const s = store({ __stts__autosend_ms: v });
       migrate(s);
       assert.equal(s.getItem('__stts__autosend_ms'), v);
@@ -58,4 +60,13 @@ test('during the agent\'s turn only its own words are dropped; short or unfinish
   for (const mine of ['rulesync and gitleaks', 'every dependency is permissive', 'MIT', '']) assert.equal(ownVoice(mine), true, mine);
   for (const his of ['yeah', 'stop', 'mm-hmm', 'wait', 'what about pricing', 'hang on']) assert.equal(ownVoice(his), false, his);
   assert.equal(ownVoice('what about pricing', false), true);   // speakers: the mic is the agent while it talks
+});
+
+test('stt and tts tell the agent to listen again when a turn reads unfinished', () => {
+  const server = readFileSync(new URL('../src/stts-mcp-server.ts', import.meta.url), 'utf8');
+  assert.match(server, /A turn can arrive mid-thought\. If the transcript reads unfinished/);
+  assert.match(server, /NO_SLEEP_NOTE \+\s*midThought\('call stt again'\)/);
+  assert.match(server, /NO_SLEEP_NOTE \+\s*midThought\('listen again \(stt\)'\)/);
+  for (const f of ['../skills/stts/SKILL.md', '../commands/stts.md', '../commands/stts.toml'])
+    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /do not answer; listen again and join the pieces/, f);
 });

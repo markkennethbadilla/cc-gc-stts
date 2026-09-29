@@ -12,7 +12,7 @@ wanted to add stuff, or ask for an update. I don't want you to stop."
 ## What it does
 
 Mark can talk while an agent works. After his usual pause (the
-auto-send setting, 3.5 seconds by default, spec 019) what he said reaches the agent
+auto-send setting, 1 second by default, spec 019) what he said reaches the agent
 at its next tool call, marked as a barge-in, with the instruction to
 keep going unless the words say otherwise. A request for an update gets
 the update and the work continues.

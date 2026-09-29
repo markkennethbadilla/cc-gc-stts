@@ -56,6 +56,11 @@ const NO_SLEEP_NOTE =
   ' Never sleep or block on another tool to wait for him: to wait, call stt again (the default ' +
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
   'Always use the default idleSec and never pass a short one: a background result arrives on its own and interrupts the listen.';
+// Spec 019: a turn is sent after 1 s of quiet, so the agent judges whether the thought is finished.
+const midThought = (again: string) =>
+  ' A turn can arrive mid-thought. If the transcript reads unfinished (trails off, ends on a connector ' +
+  `like 'and', 'so', 'but', 'like', or an incomplete clause), do not answer; ${again} and join the pieces. ` +
+  'Answer only when the thought is complete enough.';
 
 const reply = (...texts: string[]) => ({ content: texts.map((text) => ({ type: 'text' as const, text })) });
 
@@ -69,7 +74,8 @@ server.registerTool(
       ENDED_NOTE +
       NO_SPEECH_NOTE +
       CONTINUES_NOTE +
-      NO_SLEEP_NOTE,
+      NO_SLEEP_NOTE +
+      midThought('call stt again'),
     inputSchema: { idleSec },
   },
   async ({ idleSec }) => reply(await listenFor(idleSec, CALL_BUDGET_MS))
@@ -92,7 +98,8 @@ server.registerTool(
       ENDED_NOTE +
       NO_SPEECH_NOTE +
       CONTINUES_NOTE +
-      NO_SLEEP_NOTE,
+      NO_SLEEP_NOTE +
+      midThought('listen again (stt)'),
     inputSchema: {
       text: z.string().optional().describe('The text to speak. Give exactly one of text, file or url.'),
       file: z.string().optional().describe('Local path of a text or markdown file to read aloud, instead of text.'),

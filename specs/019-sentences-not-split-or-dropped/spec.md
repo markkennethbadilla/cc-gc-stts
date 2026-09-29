@@ -2,9 +2,12 @@
 
 ## What it does
 
-- The voice window waits 3.5 seconds of silence before it sends what Mark said,
-  instead of 2 seconds. A pause to think in the middle of a sentence no longer
-  sends half the sentence.
+- The voice window sends what Mark said after 1 second of silence, so a finished
+  turn reaches the agent fast. Whether the thought is finished is the agent's
+  call, not the timer's: a turn that reads unfinished (trails off, ends on "and",
+  "so", "but", "like", or an incomplete clause) gets no answer; the agent listens
+  again and joins the pieces. A pause to think no longer produces a reply to
+  half a sentence.
 - When the speech recognizer stops (Edge ends it with a `network` error about
   once a minute), it starts again at once instead of waiting up to 5 seconds
   with the microphone deaf.
@@ -19,7 +22,9 @@ Mark (2026-09-30): his speech arrived in pieces and parts of it were missing.
 Three causes, all in the page:
 
 1. Auto-send fired after 2 s of silence, so a thinking pause split a sentence
-   into two messages.
+   into two messages, each answered. A longer timer (3.5 s, tried the same day)
+   made every turn slow to send, so Mark moved to a 1 s timer with the
+   completeness judgment in the agent.
 2. `daemon.log` showed a `recognizer error network` every minute or so, even
    in silence. Every error raised a counter that only a recognized word reset,
    and the restart waited `100 * 2^count` ms, up to 5 s. After a quiet stretch
@@ -30,11 +35,16 @@ Three causes, all in the page:
 
 ## How it works
 
-- **Pause.** `PAUSE_DEFAULT_MS = 3500` in `src/stts_ui.html`. The pause is a
+- **Pause.** `PAUSE_DEFAULT_MS = 1000` in `src/stts_ui.html`. The pause is a
   saved setting in the window's `localStorage` (`__stts__autosend_ms`).
-  `migratePause` runs once per profile: if the saved value is `2000`, the old
-  default, it becomes `3500`. It then writes the marker `__stts__autosend_ms_v2`,
-  so a value Mark sets later, 2 s included, is never changed again.
+  `migratePause` runs once per profile: if the saved value is `3500` or `2000`,
+  earlier defaults, it becomes `1000`. It then writes the marker
+  `__stts__autosend_ms_v3`, so a value Mark sets later, 3.5 s or 2 s included,
+  is never changed again.
+- **Unfinished turns.** The `stt` and `tts` tool descriptions
+  (`src/stts-mcp-server.ts`), the `/stts` command and the `stts` skill tell the
+  agent: if a transcript reads unfinished, do not answer; listen again and join
+  the pieces; answer only when the thought is complete enough.
 - **Restart.** The recognizer's `end` hook restarts it after
   `restartDelay(errStreak)`: 0 ms for a first error, then 250, 500, 1000 ms,
   capped at 2 s. The streak counts only errors less than 10 s apart and resets
@@ -55,7 +65,8 @@ Three causes, all in the page:
 
 | Behavior | stts | callbot | Why they differ |
 | --- | --- | --- | --- |
-| Silence before a turn is sent | 3.5 s, a setting in the window | 3.5 s default, `CALLBOT_PAUSE_MS` | Same |
+| Silence before a turn is sent | 1 s, a setting in the window (a saved 3.5 s moves to 1 s once) | 1 s default, `CALLBOT_PAUSE_MS` | Same |
+| A turn that reads unfinished | Agent listens again and joins the pieces | Same | Same |
 | Recognizer restart after an error | At once, backoff only on rapid repeats | Not applicable | The call bot has no recognizer of its own; Recall transcribes on its servers |
 | Short or unfinished words said over the voice | Kept for the next prompt; two or more content words stop it | Delivered with a note (`OVER_HER_SHORT`); two or more content words stop her | Channel: Recall always finalises a line and names the speaker, so the call bot can hand every line over at once |
 | Own voice heard back | Dropped by word match | Dropped by speaker name | Channel: Recall labels the bot's own lines |
@@ -63,7 +74,7 @@ Three causes, all in the page:
 ## What it reads and writes
 
 - Reads and writes `__stts__autosend_ms` and the one-time marker
-  `__stts__autosend_ms_v2` in the voice window's `localStorage`.
+  `__stts__autosend_ms_v3` in the voice window's `localStorage`.
 - Writes nothing new to disk. Recognizer errors and restarts still go to
   `daemon.log` (spec 011).
 
@@ -75,14 +86,15 @@ node --test test/*.test.mjs
 ```
 
 `test/speech-not-split.test.mjs` lifts `migratePause`, `restartDelay` and
-`ownVoice` out of the real page: the default is 3.5 s, a saved 2 s moves once
-and a later 2 s stays, other values never move, the first restart waits 0 ms and
+`ownVoice` out of the real page: the default is 1 s, a saved 3.5 s or 2 s moves
+once and a later choice stays, other values never move, the tool descriptions
+carry the unfinished-turn guidance, the first restart waits 0 ms and
 the cap is 2 s, and short or unfinished words from Mark are kept while the
 agent's own words are dropped. `echo.test.mjs` still proves a backchannel does
 not stop the voice.
 
 Live check: `daemon.log` after a quiet stretch shows `recognizer error network`
-lines with no gap in what was heard; the Talk panel shows `3.5` s.
+lines with no gap in what was heard; the Talk panel shows `1` s.
 
 Hand over: this spec, and `migratePause`, `restartDelay`, `ownVoice` and the
 `currentMode === 'tts'` branch of `onResult` in `src/stts_ui.html`.

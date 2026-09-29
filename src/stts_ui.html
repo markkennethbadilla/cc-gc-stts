@@ -1561,14 +1561,16 @@
         const legacy = localStorage.getItem(LS_BARGE_IN);
         if (legacy !== null) localStorage.setItem(LS_HEADPHONE_MODE, legacy);
       }
-      /* Spec 019. A 2 s auto-send split sentences at every thinking pause (Mark 2026-09-30). The
-         default is 3.5 s, and a saved 2 s (the old default, never a choice) moves with it once. A
-         value Mark sets later, 2 s included, is left alone: the marker makes this run one time. */
-      const PAUSE_DEFAULT_MS = 3500;
+      /* Spec 019. Auto-send after 1 s of quiet (Mark 2026-09-30); the agent, not the timer, judges
+         whether the thought is finished and listens again to join the pieces. A saved 3.5 s or 2 s
+         (earlier defaults, never a choice) moves to 1 s once. A value Mark sets later, 3.5 s or 2 s
+         included, is left alone: the marker makes this run one time. */
+      const PAUSE_DEFAULT_MS = 1000;
       function migratePause(ls) {
-        if (ls.getItem('__stts__autosend_ms_v2') !== null) return;
-        if (ls.getItem(LS_AUTOSEND_MS) === '2000') ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
-        ls.setItem('__stts__autosend_ms_v2', '1');
+        if (ls.getItem('__stts__autosend_ms_v3') !== null) return;
+        const saved = ls.getItem(LS_AUTOSEND_MS);
+        if (saved === '3500' || saved === '2000') ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
+        ls.setItem('__stts__autosend_ms_v3', '1');
       }
       migratePause(localStorage);
       // The reverted PWA build left a service worker registered in the profile; it would keep
