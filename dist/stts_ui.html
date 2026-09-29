@@ -1254,6 +1254,37 @@
 
     gotitBtn.onclick = autoOrManualClose;
 
+    // Cut speech at every punctuation mark, so the first piece plays at once (stts spec 020,
+    // callbot spec 006). A cut needs a space beside the mark, which keeps 1,200 / 3.5 / 7:35,
+    // URLs and emails whole. Intl.Segmenter and sentence-splitter both cut "Mr. Smith", and a URL
+    // at its "?", so neither is used. ponytail: fixed abbreviation list; add one when it is misread.
+    function clauses(text) {
+      const t = String(text);
+      const abbr = /(?:^|\s)(?:mr|mrs|ms|dr|prof|st|jr|sr|vs|etc|no|approx|dept|inc|ltd|[a-z]|(?:[a-z]\.)+[a-z])\.$/i;
+      const pieces = [];
+      let start = 0;
+      const cut = (i) => { const p = t.slice(start, i).trim(); if (p) pieces.push(p); start = i; };
+      for (const m of t.matchAll(/\s+/g)) {
+        const i = m.index, prev = t[i - 1] || '', next = t.slice(i + m[0].length, i + m[0].length + 2);
+        const after = /[.,;:!?…)\]}"”»|\/—–-]/.test(prev) && !(prev === '.' && abbr.test(t.slice(start, i)));
+        const before = /^[([{"“«•|\/—–]/.test(next) || /^(?:[-*] |--)/.test(next);
+        if (m[0].includes('\n') || after || before) cut(i);
+      }
+      cut(t.length);
+      // Inside a word: after an em dash, en dash or pipe, and at a slash between two plain words.
+      const inner = /(?<=[—–|])(?=[\p{L}\p{N}])|(?<=(?:^|\s)\p{L}+\/)(?=\p{L}+[.,;:!?]?(?:\s|$))/u;
+      const out = [];
+      let carry = '';
+      for (const p of pieces.flatMap((p) => p.split(inner))) {
+        // A piece with no letter or digit (a lone dash, a bullet) goes with the next piece.
+        if (!/[\p{L}\p{N}]/u.test(p)) { carry += p + ' '; continue; }
+        out.push(carry + p);
+        carry = '';
+      }
+      if (carry.trim()) out.length ? (out[out.length - 1] += ' ' + carry.trim()) : out.push(carry.trim());
+      return out;
+    }
+
     function startSpeaking() {
       const textToSpeak = ttsTextarea.value.trim();
       if (hasStarted || !textToSpeak) return;
@@ -1272,7 +1303,13 @@
 
       synth.cancel();
 
-      currentUtterance = new SpeechSynthesisUtterance(textToSpeak);
+
+      // Spec 020. One utterance per piece of clauses(): the voice starts at the first comma,
+      // not after the whole sentence. Only the first piece's start and the last piece's end count.
+      const pieces = clauses(textToSpeak);
+      const utterances = pieces.map((p) => new SpeechSynthesisUtterance(p));
+      currentUtterance = utterances[utterances.length - 1];
+      const firstUtterance = utterances[0];
 
       const voice =
         voices.find((v) => v.lang === 'en-US') ||
@@ -1280,9 +1317,9 @@
         voices.find((v) => v.lang.startsWith('en')) ||
         voices[0];
 
-      if (voice) currentUtterance.voice = voice;
+      if (voice) utterances.forEach((u) => { u.voice = voice; });
 
-      currentUtterance.onstart = () => {
+      firstUtterance.onstart = () => {
         ttsContainer.classList.add('speaking');
         bars.forEach((b) => b.classList.add('animating'));
       };
@@ -1301,7 +1338,7 @@
         }
       };
 
-      currentUtterance.onerror = (e) => {
+      const onerror = (e) => {
         if (isRestarting) return;
         console.error('Speech error:', e.error);
         ttsContainer.classList.remove('speaking');
@@ -1312,7 +1349,7 @@
         hasStarted = false;
       };
 
-      synth.speak(currentUtterance);
+      utterances.forEach((u) => { u.onerror = onerror; synth.speak(u); });
     }
 
     function ttsStart() {
@@ -2225,7 +2262,8 @@
         setMuted(!muted);
       });
       const origCancel = synth.cancel.bind(synth);
-      const noteEnd = () => { speakEndedAt = Date.now(); unmuteMic(); };
+      /* Spec 020. A reply is several utterances; the mic resumes only after the last one. */
+      const noteEnd = () => { if (synth.pending) return; speakEndedAt = Date.now(); unmuteMic(); };
       SpeechSynthesis.prototype.speak = ((wrapped) => function (u) {
         u.addEventListener('start', muteMic);
         u.addEventListener('end', noteEnd); u.addEventListener('error', noteEnd);
