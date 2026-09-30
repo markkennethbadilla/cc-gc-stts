@@ -10,7 +10,7 @@ assert.ok(src, 'spec 012/013 block not found in stts_ui.html');
 
 function page(mode) {
   const s = {
-    currentMode: mode, carry: '', flushed: '', flushedAt: 0, prov: { start: 0 }, sent: [], resets: 0, barges: 0,
+    currentMode: mode, carry: '', flushed: '', rawInterim: '', flushedAt: 0, prov: { start: 0 }, sent: [], resets: 0, barges: 0,
     input: { value: '' }, stopBtn: {},
   };
   const scope = new Proxy(s, { has: (_, k) => k in s, get: (t, k) => t[k], set: (t, k, v) => { t[k] = v; return true; } });

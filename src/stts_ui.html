@@ -1956,6 +1956,7 @@
       let pendingInterim = '';    // latest interim text not yet final
       let flushed = '';           // interim text already sent, so its final is dropped
       let flushedAt = 0;
+      let rawInterim = '';        // spec 027: Edge's whole open result, before the sent part is cut
       let pauseTimer = null;
       let speakEndedAt = 0;
 
@@ -2033,13 +2034,27 @@
         if (!words.length) return true;
         return words.filter(w => !spoken.has(w)).length / words.length <= 0.34;
       }
-      // Drop the part of a final that was already sent from its interim.
-      function dedupe(text) {
-        if (!flushed || Date.now() - flushedAt > 4000) return text;
+      /* Spec 027. Edge's open result carries the WHOLE utterance so far, on every interim and on
+         its final. Once part of it was sent (auto-send, or the 1 s check listen of spec 023),
+         every later interim and the final repeated that part, so the next listen returned it
+         again (Mark 2026-09-30). Cut what was sent from interims AND the final; only a final (the
+         result closing) forgets it. A final Edge re-worded ("OK" vs "okay") is cut after the sent
+         part's last three words; if they are not found the text is kept whole, because a repeat
+         is better than a lost word (spec 019). */
+      function dedupe(text, keep) {
+        if (!flushed || Date.now() - flushedAt > 60000) return text;
         const f = norm(flushed), t = norm(text);
-        const same = f.length <= t.length && f.every((w, i) => w === t[i]);
-        flushed = '';
-        return same ? t.slice(f.length).join(' ') : text;
+        if (!keep) flushed = '';
+        let n = 0;
+        while (n < f.length && n < t.length && f[n] === t[n]) n++;
+        if (n === f.length || n === t.length) return t.slice(n).join(' ');
+        if (f.length >= 3) {
+          const tail = f.slice(-3).join(' ');
+          for (let i = Math.min(t.length, f.length + 5) - 3; i >= 0; i--) {
+            if (t.slice(i, i + 3).join(' ') === tail) return t.slice(i + 3).join(' ');
+          }
+        }
+        return text;
       }
       // Send interim text now instead of waiting for Chrome to finalise it, which for a lone
       // short word can take until the next thing is said. The later final is deduped.
@@ -2073,7 +2088,7 @@
         const full = pendingInterim;
         if (prov) prov = null;      // already on screen: keep it as typed
         else insert(dedupe(full));
-        flushed = full; flushedAt = Date.now(); pendingInterim = '';
+        flushed = rawInterim || full; flushedAt = Date.now(); pendingInterim = '';
       }
       function flushAndSend() {
         if (currentMode !== 'stt' || !autoOn.checked) return;
@@ -2108,6 +2123,8 @@
           const t = event.results[i][0].transcript;
           if (event.results[i].isFinal) finalText += t; else interim += t;
         }
+        rawInterim = interim.trim();
+        if (interim) interim = dedupe(interim, true);
         if (currentMode === 'stt') {
           if (isSpokenBack(finalText || interim)) { clearInterim(); pendingInterim = ''; return; }
           if (finalText) {
@@ -2159,7 +2176,7 @@
       function saveIdleInterim() {
         if (!idleInterim) return;
         const kept = stripCommands(idleInterim);
-        flushed = idleInterim; flushedAt = Date.now(); idleInterim = '';
+        flushed = rawInterim || idleInterim; flushedAt = Date.now(); idleInterim = '';
         if (kept) { carry = [carry, kept].filter(Boolean).join(' '); prov = null; armBarge(); }
       }
       /* Spec 012. A listen the daemon released at its time limit (the tool call has to return
