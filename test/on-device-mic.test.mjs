@@ -11,3 +11,6 @@ test('asks for on-device en-US and falls back to cloud', () => {
 test('network, aborted, no-speech are never shown to Mark', () => {
   assert.match(html, /\['network', 'aborted', 'no-speech'\]\.includes\(event\.error\)\) return;/);
 });
+test('dist/stts_ui.html (what the daemon serves) matches src', () => {
+  assert.equal(readFileSync(new URL('../dist/stts_ui.html', import.meta.url), 'utf8'), html);
+});
