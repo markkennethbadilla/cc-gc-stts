@@ -1298,20 +1298,26 @@
 
       // Spec 022. One utterance per sentence (Intl.Segmenter, as toParts on the server), never per
       // comma: every utterance boundary is an audible gap in the browser's speechSynthesis.
-      const sentences = [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(textToSpeak)]
-        .map((s) => s.segment.trim()).filter(Boolean);
-      const utterances = sentences.map((s) => new SpeechSynthesisUtterance(s));
-      currentUtterance = utterances[utterances.length - 1];
-
       // Spec 031: in Chrome the best default is Google US English (a network voice, far
       // more natural than the local SAPI David/Zira); offline it is absent and the
-      // first local en-US voice is used instead.
-      const voice =
+      // first local en-US voice is used instead. A voice picked in the bar wins.
+      const picked = voices.find((v) => v.name === localStorage.getItem('__stts__voice'));
+      const voice = picked ||
         voices.find((v) => v.name === 'Google US English') ||
         voices.find((v) => v.lang === 'en-US') ||
         voices.find((v) => v.lang.startsWith('en-US')) ||
         voices.find((v) => v.lang.startsWith('en')) ||
         voices[0];
+
+      // Spec 033: a system voice (localService, e.g. the Microsoft Online voices through
+      // NaturalVoiceSAPIAdapter) gets the whole part as one utterance, because each
+      // utterance is a new request to the voice service and every boundary is a long gap.
+      // Chrome's own network voices (Google US English) still get one per sentence.
+      const sentences = voice && voice.localService ? [textToSpeak.trim()].filter(Boolean)
+        : [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(textToSpeak)]
+          .map((s) => s.segment.trim()).filter(Boolean);
+      const utterances = sentences.map((s) => new SpeechSynthesisUtterance(s));
+      currentUtterance = utterances[utterances.length - 1];
 
       if (voice) utterances.forEach((u) => { u.voice = voice; });
 

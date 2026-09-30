@@ -15,6 +15,9 @@ test('sentence cuts only, one utterance per sentence, guidance asks for periods 
       const body = html.match(/function startSpeaking\(\) \{[\s\S]*?\n {4}\}/)[0];
       assert.match(body, /new Intl\.Segmenter\('en', \{ granularity: 'sentence' \}\)\.segment\(textToSpeak\)/, f);
       assert.match(body, /sentences\.map\(\(s\) => new SpeechSynthesisUtterance\(s\)\)/, f);
+      // Spec 033: a system (localService) voice speaks the whole part as one utterance.
+      assert.match(body, /voice && voice\.localService \? \[textToSpeak\.trim\(\)\]\.filter\(Boolean\)/, f);
+      assert.match(body, /localStorage\.getItem\('__stts__voice'\)/, f);
       assert.match(html, /const noteEnd = \(\) => \{ if \(synth\.pending\) return;/, f);
     }
     assert.deepEqual(
