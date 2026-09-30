@@ -1860,6 +1860,7 @@
           this.__hooked = true;
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
           this.addEventListener('error', (e) => {
+            this.__lastErr = e.error;   // spec 032: a 'network' end restarts at once, never waits
             if (FATAL.has(e.error)) this.__fatal = true;
             // 'aborted' is our own abort (speakers mute, pause, restart); anything else is news.
             if (this === mic && e.error !== 'aborted') { errStreak = Date.now() - lastErrAt < 10000 ? errStreak + 1 : 1; lastErrAt = Date.now(); micLog('recognizer error ' + e.error); }
@@ -1884,7 +1885,8 @@
             const retry = (delay) => setTimeout(() => {
               try { startMic(this); } catch { if (delay < 2000) retry(Math.min(Math.max(delay * 2, 100), 2000)); }
             }, delay);
-            retry(restartDelay(errStreak));
+            const net = this.__lastErr === 'network'; this.__lastErr = null;
+            retry(net ? 0 : restartDelay(errStreak));
           });
         }
         this.__wanted = true; this.__fatal = false;
@@ -2269,11 +2271,28 @@
       };
       let bargeTimer = null;
 
-      /* ---- speakers: the mic stays on while the agent talks (spec 032) ----
-         Aborting it for the speech and starting it again at the end cost about a second of
-         recognizer start-up, and Mark's first words were lost (2026-10-01). Its own voice is
-         dropped in onResult while speaking and cut from the front of any result that runs on
-         past the end (stripEcho). unmuteMic resumes a mic paused for any other reason. */
+      /* ---- speakers: mic off for all but the last sentence, fresh and on for the last (spec 032) ----
+         Restarting only when speech ended cost about a second of recognizer start-up, and Mark's
+         first words were lost. Keeping one session open through the whole reply let the
+         browser's session limit hit as he answered ('network' error, words lost; 2026-10-01).
+         So earlier sentences abort the mic, and the last one starts a FRESH session: its
+         start-up is hidden under the last sentence and the session is new when he answers.
+         Its own voice is dropped in onResult while speaking and cut from the front of any
+         result that runs on past the end (stripEcho). */
+      const onSpeakStart = () => {
+        if (bargeIn.checked || !mic || !mic.__wanted || muted) return;
+        saveIdleInterim();
+        if (synth.pending) {   // more sentences queued: mic off
+          if (mic.__paused) return;
+          mic.__paused = true;
+          try { origAbort.call(mic); } catch { }
+        } else if (mic.__paused) {   // last sentence, mic was off: start it now
+          mic.__paused = false;
+          try { startMic(mic); } catch { }
+        } else {   // last (or only) sentence, mic running: abort, and the 'end' hook restarts it at once
+          try { origAbort.call(mic); } catch { }
+        }
+      };
       const unmuteMic = () => {
         if (!mic || !mic.__paused || muted) return;
         mic.__paused = false;
@@ -2327,6 +2346,7 @@
       /* Spec 022. A reply is one utterance per sentence; the mic resumes only after the last. */
       const noteEnd = () => { if (synth.pending) return; speakEndedAt = Date.now(); unmuteMic(); };
       SpeechSynthesis.prototype.speak = ((wrapped) => function (u) {
+        u.addEventListener('start', onSpeakStart);
         u.addEventListener('end', noteEnd); u.addEventListener('error', noteEnd);
         return wrapped.call(this, u);
       })(SpeechSynthesis.prototype.speak);

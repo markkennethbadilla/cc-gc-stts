@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../src/stts_ui.html', import.meta.url), 'utf8
 const grab = (re, what) => { const m = html.match(re); assert.ok(m, what + ' not found'); return m[0]; };
 const wrapper = grab(/SR\.prototype\.start = function \(\) \{[\s\S]*?\n {6}\};/, 'start wrapper');
 const gate = grab(/function micMayRun[\s\S]*?\n {6}\}\n/, 'start gate');
-const hooks = grab(/const unmuteMic = \(\) => \{[\s\S]*?\n {6}\};/, 'speech hooks');
+const hooks = grab(/const onSpeakStart = \(\) => \{[\s\S]*?\n {6}\};\n {6}const unmuteMic = \(\) => \{[\s\S]*?\n {6}\};/, 'speech hooks');
 
 test('one gate: the raw start is called in exactly one place', () => {
   assert.equal(html.match(/origStart\.call\(/g).length, 1);
@@ -20,17 +20,18 @@ function page() {
   const SR = function () {};
   SR.prototype.addEventListener = () => {};
   let starts = 0;
-  const env = { muted: false };
-  const api = new Function('SR', 'origStart', 'env', `
+  const env = { muted: false, aborts: 0 };
+  const synth = { pending: false };
+  const api = new Function('SR', 'origStart', 'env', 'synth', `
     let mic = null, upstreamOnResult = null;
-    const onResult = () => {}, micAlive = () => {}, saveIdleInterim = () => {}, origAbort = () => {};
+    const onResult = () => {}, micAlive = () => {}, saveIdleInterim = () => {}, origAbort = () => { env.aborts++; };
     const bargeIn = { checked: false };
     ${gate.replace(/\bmuted\b/g, 'env.muted')}
     ${wrapper.replace(/\bmuted\b/g, 'env.muted')}
     ${hooks.replace(/\bmuted\b/g, 'env.muted')}
-    return { speakStart: () => {}, speakEnd: unmuteMic };   // spec 032: speech no longer pauses the mic
-  `)(SR, function () { starts++; }, env);
-  return { rec: new SR(), env, starts: () => starts, ...api };
+    return { speakStart: onSpeakStart, speakEnd: unmuteMic };
+  `)(SR, function () { starts++; }, env, synth);
+  return { rec: new SR(), env, synth, starts: () => starts, ...api };
 }
 
 test('muted: 5 consecutive listens never start the mic, then unmute starts it (x3)', () => {
@@ -72,11 +73,23 @@ test('pause pressed during playback holds after the speech ends', () => {
   assert.equal(p.starts(), 2, 'unpause still works');
 });
 
-test('not muted: speech never stops the mic (spec 032)', () => {
+test('spec 032: earlier sentences mute the mic, the last starts it before the voice ends', () => {
   const p = page();
-  p.rec.start(); p.speakStart(); p.speakEnd();
-  assert.equal(p.starts(), 1, 'no stop, so no restart and no start-up gap');
-  assert.notEqual(p.rec.__paused, true);
+  p.rec.start();
+  p.synth.pending = true; p.speakStart();           // sentence 1 of 3
+  assert.equal(p.rec.__paused, true); assert.equal(p.env.aborts, 1);
+  p.speakStart();                                     // sentence 2: already off, no extra abort
+  assert.equal(p.env.aborts, 1);
+  p.synth.pending = false; p.speakStart();          // last sentence: mic on now, not at the end
+  assert.equal(p.starts(), 2); assert.equal(p.rec.__paused, false);
+  p.speakEnd();                                       // the end adds no restart (no start-up gap)
+  assert.equal(p.starts(), 2);
+});
+
+test('spec 032: a one-sentence reply gives a fresh session (abort, the end hook restarts it)', () => {
+  const p = page();
+  p.rec.start(); p.speakStart();
+  assert.equal(p.env.aborts, 1); assert.notEqual(p.rec.__paused, true);
 });
 
 test('edge/stress: muted before the first listen, 1000 listens and replies capture nothing', () => {
