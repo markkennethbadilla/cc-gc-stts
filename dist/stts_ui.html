@@ -68,14 +68,10 @@
       padding: 14px;
     }
 
-    #stt-panel {
-      flex: 1;
-      min-width: 200px;
-    }
-
+    #stt-panel,
     #tts-panel {
       flex: 1;
-      min-width: 200px;
+      min-width: 0;
     }
 
     .splitter {
@@ -139,6 +135,7 @@
       border-radius: 8px;
     }
 
+    #end-btn { gap: 0.3em; }
     #end-btn:hover {
       filter: brightness(1.15);
     }
@@ -201,8 +198,9 @@
       padding: 16px;
       background: transparent;
       color: var(--text-color);
-      font-size: 15px;
-      line-height: 1.5;
+      font-size: 17px;
+      line-height: 1.62;
+      overflow-wrap: anywhere;
       resize: none;
       outline: none;
     }
@@ -382,7 +380,7 @@
       top: 0;
       right: 0;
       bottom: 0;
-      width: 480px;
+      width: min(480px, 100%);
       background: var(--bg-color);
       border-left: 1px solid var(--border-color);
       box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
@@ -608,6 +606,31 @@
       border-color: var(--danger-color);
     }
 
+    /* Spec 025: narrow strip. Below 560px wide the panels stack, Talk on top with the most room,
+       and every control drops to its icon. Below 360px tall the chrome goes so the words stay. */
+    .bottom-bar { flex-wrap: wrap; }
+    @media (max-width: 560px) {
+      .panels-row { flex-direction: column; }
+      .splitter, .hint, .history-bar, .panel-label, #visualizer, .tts-status, .btn-text { display: none; }
+      #stt-panel, #tts-panel { width: auto !important; flex: 1 1 0 !important; padding: 6px; }
+      #stt-panel { flex-grow: 2 !important; }
+      textarea { padding: 8px 10px; font-size: 16px; }
+      .bottom-bar { padding: 6px 8px; gap: 6px; }
+      .actions { gap: 6px; }
+      #send-btn, #play-btn, #stop-btn, #gotit-btn { padding: 0 10px; }
+      .end-bar { padding: 6px 8px; }
+      #end-btn { padding: 0 14px; height: 32px; font-size: 14px; }
+      #settings-btn span, #theme-btn span { display: none; }
+      #settings-btn, #theme-btn { padding: 0 8px; }
+      #settings-btn { left: 8px; }
+      #theme-btn { right: 8px; }
+    }
+    @media (max-height: 360px) {
+      .hint, .history-bar, .panel-label, #tts-panel, .stt-status { display: none; }
+      #stt-panel { padding: 4px; }
+      .bottom-bar, .end-bar { padding: 4px 8px; }
+    }
+
     .panel.inactive>.container .history-bar,
     .panel.inactive #tts-container .bottom-bar {
       pointer-events: auto;
@@ -702,13 +725,13 @@
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M8 5v14l11-7z" />
               </svg>
-              Play
+              <span class="btn-text">Play</span>
             </button>
             <button id="stop-btn" disabled>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M6 6h12v12H6z" />
               </svg>
-              Stop
+              <span class="btn-text">Stop</span>
             </button>
             <button id="gotit-btn" disabled>Got it!</button>
           </div>
@@ -718,7 +741,7 @@
   </div><!-- /panels-row -->
 
   <div class="end-bar">
-    <button id="end-btn">End conversation</button>
+    <button id="end-btn">End<span class="btn-text">conversation</span></button>
   </div>
 
   <script>
@@ -1943,6 +1966,7 @@
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
         document.execCommand('insertText', false, sep + text);
+        input.scrollTop = input.scrollHeight;
       }
       /* Upstream's own onresult writes with execCommand('insertText'), which goes to whatever is
          focused; a click on empty page chrome moved focus off the textarea and the words vanished.
@@ -2033,6 +2057,7 @@
         input.focus();
         input.setSelectionRange(start, v.length);
         document.execCommand('insertText', false, sep + t);
+        input.scrollTop = input.scrollHeight;
         prov = { start };
       }
       function clearInterim() {

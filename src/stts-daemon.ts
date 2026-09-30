@@ -86,7 +86,9 @@ function getChromeUserDataDir(): string {
   const base = process.platform === 'win32'
     ? (process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || tmpdir(), 'AppData', 'Local'))
     : path.join(process.env.HOME || tmpdir(), '.local', 'share');
-  const dir = path.join(base, 'cc-gc-stts', 'profile');
+  // Spec 026: a daemon on a test port gets its own browser profile, so a test's
+  // window can never share a browser process with the live one.
+  const dir = path.join(base, 'cc-gc-stts', FIXED_PORT === 15986 ? 'profile' : `profile-${FIXED_PORT}`);
   const old = path.join(tmpdir(), 'cc-gc-stts-user-data-dir');
   if (!fs.existsSync(dir) && fs.existsSync(old)) {
     mkdirSync(path.dirname(dir), { recursive: true });
@@ -227,7 +229,9 @@ function resolvePending(text: string) {
   pending = null;
   clearPendingTimer();
   p.respond(text);
-  if (p.config.close) setTimeout(closeWindow, 200);
+  // Spec 026: only the main session closes the window. The hook marks the caller
+  // (voiceOwner = session|agent); a helper has a non-empty agent part.
+  if (p.config.close && (!voiceOwner || voiceOwner.endsWith('|'))) setTimeout(closeWindow, 200);
 }
 
 const server = http.createServer(async (req, res) => {
