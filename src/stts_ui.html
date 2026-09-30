@@ -1123,6 +1123,8 @@
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error', event.error);
+        // Spec 035: 'network', 'aborted' and 'no-speech' are routine session ends that restart at once; never shown.
+        if (['network', 'aborted', 'no-speech'].includes(event.error)) return;
         sttStatus.textContent = 'Error: ' + event.error;
         setTimeout(() => { sttStatus.textContent = 'Listening...'; }, 3000);
       };
@@ -1964,8 +1966,18 @@
          the mic (listen, tts end, watchdogs, end-retry, unpause) goes through here, so Mark's
          pause wins over all of them. Returns true if it started. */
       function micMayRun(r) { return !!r && r.__wanted && !r.__fatal && !r.__paused && !(r === mic && muted); }
+      /* Spec 035. On-device recognition (Chrome 139+): no Google server, so no 'network' session ends.
+         en-US pack missing: ask Chrome to install it and use the cloud until it lands. */
+      let local = false;
+      const LOCAL = { langs: ['en-US'], processLocally: true };
+      if (SR.available) SR.available(LOCAL).then(st => {
+        micLog('on-device en-US: ' + st);
+        if (st === 'available') local = true;
+        else if (st !== 'unavailable') SR.install(LOCAL).then(ok => { micLog('on-device install ' + ok); local = !!ok; }).catch(e => micLog('on-device install failed ' + e.message));
+      }).catch(() => { });
       function startMic(r) {
         if (!micMayRun(r)) return false;
+        if ('processLocally' in r) r.processLocally = local && !r.__cloud;
         origStart.call(r);
         return true;
       }
@@ -1977,11 +1989,12 @@
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
           this.addEventListener('error', (e) => {
             this.__lastErr = e.error;   // spec 032: a 'network' end restarts at once, never waits
+            if (e.error === 'language-not-supported' && this.processLocally) { this.__cloud = true; micLog('on-device refused, cloud instead'); return; }
             if (FATAL.has(e.error)) this.__fatal = true;
             // 'aborted' is our own abort (speakers mute, pause, restart); anything else is news.
             if (this === mic && e.error !== 'aborted') { errStreak = Date.now() - lastErrAt < 10000 ? errStreak + 1 : 1; lastErrAt = Date.now(); micLog('recognizer error ' + e.error); }
           });
-          this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); if (this === mic) micRunning = true; });
+          this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); if (this === mic) { micRunning = true; micLog('mic start' + (synth.speaking ? ' (speaking)' : '')); } });
           this.addEventListener('audiostart', () => { if (this === mic) heardAt = Date.now(); });
           this.addEventListener('result', () => { micAlive(); lastResultAt = heardAt = Date.now(); errStreak = 0; });
           this.addEventListener('soundstart', micAlive);
