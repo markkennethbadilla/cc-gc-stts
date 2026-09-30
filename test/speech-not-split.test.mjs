@@ -76,17 +76,6 @@ test('a recognizer that ends restarts at once; only rapid repeat failures back o
   for (const n of [5, 6, 50, 1000]) assert.equal(restartDelay(n), 2000);
 });
 
-const agent = 'Every dependency is permissive, rulesync and gitleaks are MIT';
-const ownVoiceSrc = [grab(/const STOP = new Set\([^;]+;/, 'STOP'), grab(/const norm = \(s\) =>[^;]+;/, 'norm'),
-  grab(/const content = \(s\) =>[^;]+;/, 'content'), grab(/function ownVoice\(text\) \{[\s\S]*?\n {6}\}/, 'ownVoice')].join('\n');
-const ownVoice = (text, headphones = true) => new Function('synth', 'ttsTextarea', 'speakEndedAt', 'Date', 'bargeIn', `${ownVoiceSrc}\nreturn ownVoice;`)(
-  { speaking: true }, { value: agent }, 0, { now: () => 0 }, { checked: headphones })(text);
-
-test('during the agent\'s turn only its own words are dropped; short or unfinished words from Mark are kept', () => {
-  for (const mine of ['rulesync and gitleaks', 'every dependency is permissive', 'MIT', '']) assert.equal(ownVoice(mine), true, mine);
-  for (const his of ['yeah', 'stop', 'mm-hmm', 'wait', 'what about pricing', 'hang on']) assert.equal(ownVoice(his), false, his);
-  assert.equal(ownVoice('what about pricing', false), true);   // speakers: the mic is the agent while it talks
-});
 
 test('stt and tts tell the agent to listen again when a turn reads unfinished', () => {
   const server = readFileSync(new URL('../src/stts-mcp-server.ts', import.meta.url), 'utf8');

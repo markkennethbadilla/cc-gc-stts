@@ -12,7 +12,7 @@ voice does not stop it either: the voice finishes what it is saying
   "insert comma", "new paragraph", "select all", "undo it" and the rest).
 - The Listen panel's spoken commands are gone ("play it", "stop it", "got it",
   "repeat", "slower", "faster"), including while the agent works.
-- Talking over the agent in headphone mode: the voice keeps going to the end.
+- Talking over the agent: the voice keeps going to the end.
   His words, short or long, are kept (spec 019) and reach the agent with the
   next prompt, or as a barge-in after his pause once the agent is working.
 - Only a press stops the voice: the Stop button, or the agent's own next call.
@@ -37,15 +37,13 @@ the voice cut replies in half. The same change landed in the WeAssist call bot
 - `extractCommands` (Talk) returns the text unchanged; `extractTtsCommands`
   (Listen) returns no effects. The command regexes, the spec 003 additions and
   the idle "repeat" path are deleted, and the cheat-sheet buttons are hidden.
-- Headphone mode, while the agent speaks: `ownVoice` drops text mostly made of
-  the spoken text. Every other final goes to `carry` (spec 019); nothing in that
+- While the agent speaks, the mic stays on; its own voice is removed by the
+  browser's echo canceller before recognition (spec 037). Every final goes to `carry` (spec 019); nothing in that
   branch stops the voice or ends the `tts` call. After the voice ends, `carry`
   opens the next prompt, or is sent to the daemon as a barge-in after his pause.
 - The old talk-over path (`isEcho`, the page's `heard` message, the daemon's
   `__STTS_HEARD__` reply, and the `tts` tool's "He spoke while you were
   speaking") is deleted.
-- With speakers (headphone mode off) the mic is off while the agent speaks, so
-  there is no talking over it; nothing changed there.
 
 ### Parity with the call bot
 
@@ -54,7 +52,7 @@ the voice cut replies in half. The same change landed in the WeAssist call bot
 | Spoken commands | None | None | Same |
 | Someone talks over the voice | It finishes; his words are kept for the next prompt, or reach the agent as a barge-in after his pause | She finishes; the words come back on the listen the agent holds, with `OVER_HER` | `call_say` returns after part 1, so that agent is already listening; stts has no listen open during its own voice |
 | Short line ("yeah", one word) | Kept, same as any line | Kept, same as any line | Same |
-| Its own voice heard back | Dropped (`ownVoice`) | Long echo dropped, short piece kept with the note | Recall transcribes her too; Edge speech only picks up the room |
+| Its own voice heard back | Removed by the browser echo canceller before recognition (spec 037) | Recall transcribes each participant from their own stream; her lines carry her name and are skipped (callbot spec 011) | Channel: a browser mic vs a meeting with per-participant audio |
 | Stop | Stop button, or the agent's next call | `call_say` `stop: true` | No page button in a meeting |
 
 ## What it reads and writes
@@ -73,7 +71,7 @@ Tests: the `tts` branch of the page's result handler keeps every final in
 `isEcho`; the daemon has no `heard` case; the stop button still sends
 `stopped`; no `COMMAND_REGEX` remains. Run three times, all green.
 
-Not tested live: with headphone mode on, talk over a long reply; the voice
+Not tested live: talk over a long reply; the voice
 should finish, and the words should open the next prompt.
 
 Hand over: this spec, the `tts` branch and `ownVoice` in `src/stts_ui.html`,

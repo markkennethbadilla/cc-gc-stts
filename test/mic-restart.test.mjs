@@ -63,7 +63,7 @@ test('the watchdog clears a stale speech pause and logs every restart', () => {
 
 test('recognizer errors are logged; only errors under 10 s apart widen the restart delay (spec 019)', () => {
   assert.match(html, /e\.error !== 'aborted'\) \{ errStreak = Date\.now\(\) - lastErrAt < 10000 \? errStreak \+ 1 : 1; lastErrAt = Date\.now\(\); micLog\(/);
-  assert.match(html, /retry\(net \? 0 : restartDelay\(errStreak\)\)/);   // spec 032: 'network' restarts at once
+  assert.match(html, /retry\(net \? 0 : restartDelay\(errStreak\)\)/);   // spec 019: 'network' restarts at once
   assert.match(html, /lastResultAt = heardAt = Date\.now\(\); errStreak = 0;/);
 });
 

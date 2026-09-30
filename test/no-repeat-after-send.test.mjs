@@ -19,9 +19,9 @@ function page() {
   const scope = new Proxy(s, { has: (_, k) => k in s, get: (t, k) => t[k], set: (t, k, v) => { t[k] = v; return true; } });
   const insert = (t) => { if (t) s.input.value += (s.input.value ? ' ' : '') + t; };
   const fns = {
-    isSpokenBack: () => false, ownVoice: () => false, clearInterim: () => { s.prov = null; }, keepCaret: () => {},
+    clearInterim: () => { s.prov = null; }, keepCaret: () => {},
     armPause: () => {}, armBarge: () => {}, stripCommands: (t) => t, mic: {}, insert,
-    bargeIn: { checked: false }, synth: { speaking: false }, echoIdx: -1, stripEcho: (t) => t, stripTail: (t) => t,   // spec 032, 036
+    synth: { speaking: false },
     showInterim: () => {},   // interim stays pending, sent by flushInterim (the auto-send path)
     upstreamOnResult: { call: (_, e) => insert(e.results[0][0].transcript.trim()) },
   };

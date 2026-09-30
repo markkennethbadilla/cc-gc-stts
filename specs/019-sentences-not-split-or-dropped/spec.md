@@ -16,7 +16,7 @@
   once a minute), it starts again at once instead of waiting up to 5 seconds
   with the microphone deaf.
 - Words Mark says while the agent is speaking are kept for his next message,
-  unless they are the agent's own voice coming back through the microphone.
+  The agent's own voice never reaches the recognizer (spec 037).
 
 ## Why it exists
 
@@ -66,10 +66,8 @@ Three causes, all in the page:
   on any recognized word. A `start()` that throws retries with a widening delay
   up to 2 s, and the spec 011 watchdog still catches a recognizer that died
   silently.
-- **During the agent's turn.** `ownVoice(text)` decides what is the agent's own
-  voice: heard while it speaks or within 1.5 s after, and nearly all words from
-  the text it is saying (with speakers, everything heard while it speaks, since
-  the microphone is paused then anyway). That is dropped. Talking over it never
+- **During the agent's turn.** The agent's own voice is removed by the browser's
+  echo canceller before recognition (spec 037). Talking over it never
   stops the voice (spec 016). Everything else heard in the agent's turn goes
   into `carry` (finals) or the held interim (unfinished text, spec 012).
 
@@ -84,7 +82,7 @@ Three causes, all in the page:
 | The agent is told | Tool descriptions, and a note on the returned transcript | The same | Same |
 | Recognizer restart after an error | At once, backoff only on rapid repeats | Not applicable | The call bot has no recognizer of its own; Recall transcribes on its servers |
 | Words said over the voice | Kept for the next prompt; the voice finishes | Kept, delivered with `OVER_HER`; she finishes | Same outcome |
-| Own voice heard back | Dropped by word match | Dropped by speaker name | Channel: Recall labels the bot's own lines |
+| Own voice heard back | Browser echo canceller (spec 037) | Per-participant streams, skipped by speaker name (callbot spec 011) | Channel: browser mic vs meeting streams |
 
 ## What it reads and writes
 

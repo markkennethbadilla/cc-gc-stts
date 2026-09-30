@@ -106,7 +106,3 @@ test('sending or cancelling a prompt never switches the mic off (live CDP findin
   assert.match(html, /async function submit\(\) \{[\s\S]*?if \(isRecording\) toggleDictation\(\);/);
   assert.match(html, /async function cancel\(\) \{\s*if \(isRecording\) toggleDictation\(\);/);
 });
-
-test('a cancel with nothing playing is not "speech just ended", so the echo filter keeps his next words', () => {
-  assert.match(html, /SpeechSynthesis\.prototype\.cancel = function \(\) \{\s*if \(this\.speaking \|\| this\.pending\) noteEnd\(\); else unmuteMic\(\);/);
-});

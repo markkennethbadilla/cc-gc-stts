@@ -18,7 +18,6 @@ test('sentence cuts only, one utterance per sentence, guidance asks for many mar
       // Spec 033: a system (localService) voice speaks the whole part as one utterance.
       assert.match(body, /voice && voice\.localService \? \[textToSpeak\.trim\(\)\]\.filter\(Boolean\)/, f);
       assert.match(body, /localStorage\.getItem\('__stts__voice'\)/, f);
-      assert.match(html, /const noteEnd = \(\) => \{ if \(synth\.pending\) return;/, f);
     }
     assert.deepEqual(
       sentences('First, the plan; then: the rest, okay. It cost 1,200 at 7:35, see x.io/a. Done, thanks.'),

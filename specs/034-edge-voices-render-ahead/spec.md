@@ -7,8 +7,7 @@ speech with Microsoft's online (Edge) voices through `edge-tts-universal`
 1.4.0, the same package and version as the call bot. Each reply is cut at every
 punctuation mark, up to three clips are rendered ahead while one plays, and
 each clip plays without the silence Edge puts before and after the words.
-Rate (default 1.3), volume, voice, Stop, barge-in, the echo filter, the mic
-starting on the last clip (spec 032), and reading files and URLs in parts all
+Rate (default 1.3), volume, voice, Stop, barge-in, and reading files and URLs in parts all
 work as before. If a clip cannot be rendered (offline, service down), that
 clip is spoken by the browser's own voice.
 

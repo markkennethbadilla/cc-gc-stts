@@ -1547,24 +1547,16 @@
        Adds: voice picker; one always-on microphone shared by both panels; auto-send after a pause
        that also flushes interim (not yet final) speech, so a lone "yes" is sent; speech captured
        while the agent is thinking or talking is carried into the next prompt; barge-in (talking over
-       the agent stops it) with an echo filter so the agent's own voice is not mistaken for Mark. -->
+       the agent stops it) on an echo-cancelled mic track so the agent's own voice never reaches the recognizer (spec 037). -->
   <script>
     (function () {
       const LS_VOICE = '__stts__voice';
       const LS_AUTOSEND = '__stts__autosend';
       const LS_AUTOSEND_MS = '__stts__autosend_ms';
       const LS_STOP_ON_SILENCE = '__stts__stop_on_silence';
-      const LS_BARGE_IN = '__stts__barge_in'; // legacy key, migrated below into LS_HEADPHONE_MODE
-      const LS_HEADPHONE_MODE = '__stts__headphone_mode';
       const LS_THEME = '__stts__theme';
       const LS_RATE = '__stts__rate';
       const LS_RAISE = '__stts__raise';
-      // Migration: anyone who already set the old barge-in flag keeps their setting under its
-      // new name instead of being silently reset to default.
-      if (localStorage.getItem(LS_HEADPHONE_MODE) === null) {
-        const legacy = localStorage.getItem(LS_BARGE_IN);
-        if (legacy !== null) localStorage.setItem(LS_HEADPHONE_MODE, legacy);
-      }
       /* Spec 019. Auto-send after 0.7 s of quiet (Mark 2026-09-30), or after the longer hold
          when what he said so far reads unfinished (readsUnfinished below); the agent still judges
          whether the thought is finished and listens again to join the pieces. A saved 3.5 s, 2 s,
@@ -1594,7 +1586,7 @@
 
       /* ---- spec 034: Microsoft online voices, the call bot's way ----
          speechSynthesis.speak/cancel/speaking/pending are replaced, so upstream and the rest of
-         this block (rate, barge-in, echo filter, mic on the last clip) keep working unchanged.
+         this block (rate, barge-in) keep working unchanged.
          Each utterance is cut at every punctuation mark by the daemon (/edge/split, the call
          bot's clauses()), up to three clips render ahead while one plays (/edge/clip,
          edge-tts-universal), and each clip plays without Edge's leading and trailing silence.
@@ -1663,7 +1655,7 @@
             if (mine !== gen) break;
             clips.shift();
             cur = c;
-            fire(c.item.u, 'start');   // per clip, so the mic starts on the LAST clip (spec 032)
+            fire(c.item.u, 'start');   // per clip
             await (a ? playBuf(a) : playNative(c));
             if (mine !== gen) break;
             cur = null;
@@ -1802,7 +1794,7 @@
       const settingsBtn = document.createElement('button');
       settingsBtn.id = 'settings-btn';
       settingsBtn.tabIndex = -1;
-      settingsBtn.title = 'Settings: voice, rate, auto-send, silence, headphone mode';
+      settingsBtn.title = 'Settings: voice, rate, auto-send, silence';
       settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span>Settings</span>';
       settingsBtn.onclick = (e) => {
         e.stopPropagation();
@@ -1917,7 +1909,6 @@
       // Spec 019: the wait before sending what he said, longer when it reads unfinished.
       const quietMs = (text) => (readsUnfinished(text) ? Math.max(holdMs(), pauseMs()) : pauseMs());
       const stopOnSilence = checkbox(sttContainer, 'Silence', 'stop-on-silence', 'stop listening on silence', LS_STOP_ON_SILENCE, false).box;
-      const bargeIn = checkbox(ttsContainer, 'Headphone mode', 'barge-in', 'mic stays open while the agent speaks; talk over it to interrupt', LS_HEADPHONE_MODE, false).box;
       /* Spec 003: bring-to-front on every request stole focus from whatever Mark was typing.
          Off by default; the daemon reads it over the socket on connect and on change. */
       const raiseBox = checkbox(ttsContainer, 'Window', 'raise-on-request', 'raise the window on every request', LS_RAISE, false).box;
@@ -1985,10 +1976,22 @@
           ['pointerdown', 'keydown'].forEach(t => addEventListener(t, go, true));
         }
       }).catch(() => { });
+      /* Spec 037. The recognizer listens to an echo-cancelled mic track (Chrome 135+ start(track)),
+         so the browser's own acoustic echo canceller removes the agent's voice before recognition.
+         Chrome-wide AEC cancels everything Chrome plays, which covers the Microsoft online voices
+         (played through WebAudio); a Windows system voice plays outside Chrome and is not covered.
+         Until the track is ready, or if it fails, the recognizer opens the default mic. */
+      let aecTrack = null;
+      function freshTrack() {
+        navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+          .then(s => { aecTrack = s.getAudioTracks()[0]; aecTrack.onended = freshTrack; micLog('echo-cancelled mic ready'); })
+          .catch(e => micLog('echo-cancelled mic failed ' + e.message));
+      }
+      freshTrack();
       function startMic(r) {
         if (!micMayRun(r)) return false;
         if ('processLocally' in r) r.processLocally = local && !r.__cloud;
-        origStart.call(r);
+        origStart.call(r, ...(aecTrack?.readyState === 'live' ? [aecTrack] : []));
         return true;
       }
       let mic = null;             // the STT panel's recognizer, captured on its first start()
@@ -1998,10 +2001,10 @@
           this.__hooked = true;
           if (!mic) { mic = this; upstreamOnResult = this.onresult; this.onresult = onResult; }
           this.addEventListener('error', (e) => {
-            this.__lastErr = e.error;   // spec 032: a 'network' end restarts at once, never waits
+            this.__lastErr = e.error;   // spec 019: a 'network' end restarts at once, never waits
             if (e.error === 'language-not-supported' && this.processLocally) { this.__cloud = true; micLog('on-device refused, cloud instead'); return; }
             if (FATAL.has(e.error)) this.__fatal = true;
-            // 'aborted' is our own abort (speakers mute, pause, restart); anything else is news.
+            // 'aborted' is our own abort (pause, restart); anything else is news.
             if (this === mic && e.error !== 'aborted') { errStreak = Date.now() - lastErrAt < 10000 ? errStreak + 1 : 1; lastErrAt = Date.now(); micLog('recognizer error ' + e.error); }
           });
           this.addEventListener('start', () => { ttsContainer.classList.add('listening'); micAlive(); if (this === mic) { micRunning = true; micLog('mic start' + (synth.speaking ? ' (speaking)' : '')); } });
@@ -2017,7 +2020,7 @@
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
-            if (this === mic) { micRunning = false; endedAt = Date.now(); echoIdx = -1; saveIdleInterim(); }
+            if (this === mic) { micRunning = false; endedAt = Date.now(); saveIdleInterim(); }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
             // for the rest of the session. Retry with a widening delay, capped at 2 s.
@@ -2127,33 +2130,6 @@
       let flushedAt = 0;
       let rawInterim = '';        // spec 027: the browser's whole open result, before the sent part is cut
       let pauseTimer = null;
-      let speakEndedAt = 0;
-      /* Spec 032. echoIdx is the last result index heard while the agent spoke (speakers mode).
-         Such a result can run on into Mark's reply when he answers at once, so its leading
-         words that the agent just said are cut and the rest is kept. */
-      let echoIdx = -1;
-      function stripEcho(text) {
-        const spoken = new Set(norm(ttsTextarea.value));
-        const toks = text.trim().split(/\s+/);
-        let i = 0;
-        while (i < toks.length && norm(toks[i]).every(w => spoken.has(w))) i++;
-        return toks.slice(i).join(' ');
-      }
-
-      /* Spec 036. On-device recognition can close the result for the agent's LAST clip after the
-         voice stopped, as a new result, so echoIdx never covers it ("Then say hello", 2026-10-01).
-         Within 5 s of the speech ending, any leading run of words that is a contiguous run of the
-         last 12 spoken words is cut; whatever follows is Mark's and is kept. */
-      function stripTail(text) {
-        if (!text || (!synth.speaking && Date.now() - speakEndedAt > 5000)) return text;
-        const tail = ' ' + norm(ttsTextarea.value).slice(-12).join(' ') + ' ';
-        const toks = text.trim().split(/\s+/);
-        for (let k = toks.length; k > 0; k--) {
-          const w = norm(toks.slice(0, k).join(' '));
-          if (w.length && tail.includes(' ' + w.join(' ') + ' ')) return toks.slice(k).join(' ');
-        }
-        return text;
-      }
       const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
       function insert(text) {
         if (!text) return;
@@ -2197,36 +2173,6 @@
       }
       function stripCommands(text) {
         return text.replace(/\s+/g, ' ').trim();
-      }
-      // Speech that is mostly words from the text being spoken, heard while it is spoken or just
-      // after, is the agent's own voice coming back through the mic.
-      // Judged on content words only, and a third of them may be misheard. Fewer than two
-      // content words is not enough evidence either way, so it waits for more.
-      const STOP = new Set('a an the i you it to of and or is are was be do so that this in on at for with me my your we they he she not no yes ok okay um uh yeah mm hmm mhm huh right'.split(' '));
-      const content = (s) => norm(s).filter(w => !STOP.has(w));
-      /* The Talk panel had no echo test at all: after speaking with listen on, the mode is stt,
-         so a late transcript of the agent's own voice went straight into the prompt and was sent
-         back as if Mark had said it (Mark 2026-09-17, twice in a row). ownVoice does not cover it
-         because its window is 1.5 s and the final lands later. This is the strict version, for
-         text that is about to be treated as Mark's: a long run of words that are nearly all from
-         what was just spoken. Four content words and at most a quarter of them unmatched, so a
-         short human reply ("yeah", "no, the other one") is never swallowed. */
-      function isSpokenBack(text) {
-        if (!synth.speaking && Date.now() - speakEndedAt > 20000) return false;
-        const spoken = new Set(norm(ttsTextarea.value));
-        const words = content(text);
-        if (words.length < 4) return false;
-        return words.filter(w => !spoken.has(w)).length / words.length <= 0.25;
-      }
-      /* Spec 019. Only the agent's own voice is thrown away: words that are nearly all from what
-         it is saying, heard while it speaks or just after. Anything else is Mark and is kept. */
-      function ownVoice(text) {
-        if (!synth.speaking && Date.now() - speakEndedAt > 1500) return false;
-        if (!bargeIn.checked && synth.speaking) return true;   // speakers: anything heard while speaking is the agent
-        const spoken = new Set(norm(ttsTextarea.value));
-        const words = content(text).length ? content(text) : norm(text);
-        if (!words.length) return true;
-        return words.filter(w => !spoken.has(w)).length / words.length <= 0.34;
       }
       /* Spec 027. the browser's open result carries the WHOLE utterance so far, on every interim and on
          its final. Once part of it was sent (auto-send, or the 1 s check listen of spec 023),
@@ -2313,17 +2259,13 @@
 
       function onResult(event) {
         let finalText = '', interim = '';
-        if (!bargeIn.checked && synth.speaking) { echoIdx = event.results.length - 1; return; }   // spec 032
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          let t = event.results[i][0].transcript;
-          if (i <= echoIdx) t = stripEcho(t);
+          const t = event.results[i][0].transcript;
           if (event.results[i].isFinal) finalText += t; else interim += t;
         }
-        if (currentMode === 'stt') { finalText = stripTail(finalText); interim = stripTail(interim); }
         rawInterim = interim.trim();
         if (interim) interim = dedupe(interim, true);
         if (currentMode === 'stt') {
-          if (isSpokenBack(finalText || interim)) { clearInterim(); pendingInterim = ''; return; }
           if (finalText) {
             clearInterim();
             const text = dedupe(finalText);
@@ -2338,7 +2280,6 @@
           return;
         }
         const text = finalText || interim;
-        if (ownVoice(text)) return;
         if (currentMode === 'tts') {
           /* Spec 016 (Mark 2026-09-30). Talking over the agent does not stop the voice: it
              finishes. Spec 019: everything he says during the agent's turn (not its own voice)
@@ -2426,38 +2367,11 @@
       };
       let bargeTimer = null;
 
-      /* ---- speakers: mic off for all but the last sentence, fresh and on for the last (spec 032) ----
-         Restarting only when speech ended cost about a second of recognizer start-up, and Mark's
-         first words were lost. Keeping one session open through the whole reply let the
-         browser's session limit hit as he answered ('network' error, words lost; 2026-10-01).
-         So earlier sentences abort the mic, and the last one starts a FRESH session: its
-         start-up is hidden under the last sentence and the session is new when he answers.
-         Its own voice is dropped in onResult while speaking and cut from the front of any
-         result that runs on past the end (stripEcho). */
-      const onSpeakStart = () => {
-        if (bargeIn.checked || !mic || !mic.__wanted || muted) return;
-        saveIdleInterim();
-        if (synth.pending) {   // more sentences queued: mic off
-          if (mic.__paused) return;
-          mic.__paused = true;
-          try { origAbort.call(mic); } catch { }
-        } else if (mic.__paused) {   // last sentence, mic was off: start it now
-          mic.__paused = false;
-          try { startMic(mic); } catch { }
-        } else {   // last (or only) sentence, mic running: abort, and the 'end' hook restarts it at once
-          try { origAbort.call(mic); } catch { }
-        }
-      };
-      const unmuteMic = () => {
-        if (!mic || !mic.__paused || muted) return;
-        mic.__paused = false;
-        try { startMic(mic); } catch { }
-      };
 
       /* Spec 003/006: Space pauses and resumes the mic anywhere in the window, one press
          each way (play/pause, not hold-to-pause — there is no keyup handler). A space typed
          into any field just types a space now (spec 006): the key handler skips entirely
-         when the event target is editable. Same abort path as the speakers mute; the 'end'
+         when the event target is editable. Aborts the mic; the 'end'
          hook sees __paused and does not restart until resumed. Pausing also holds the
          auto-send countdown (armPause/armBarge check `muted` before arming, and setMuted
          clears whatever is already armed), so nothing is ever submitted while paused. */
@@ -2497,22 +2411,6 @@
         e.preventDefault();
         setMuted(!muted);
       });
-      const origCancel = synth.cancel.bind(synth);
-      /* Spec 022. A reply is one utterance per sentence; the mic resumes only after the last. */
-      const noteEnd = () => { if (synth.pending) return; speakEndedAt = Date.now(); unmuteMic(); };
-      SpeechSynthesis.prototype.speak = ((wrapped) => function (u) {
-        u.addEventListener('start', onSpeakStart);
-        u.addEventListener('end', noteEnd); u.addEventListener('error', noteEnd);
-        return wrapped.call(this, u);
-      })(SpeechSynthesis.prototype.speak);
-      /* Spec 012. resetToIdle cancels speech on every turn change, including right after Mark's
-         prompt is sent, when nothing is playing. Stamping that as "speech just ended" made the
-         echo filter drop the first 1.5 s of whatever he said next (speakers mode). Only a cancel
-         that actually cut speech counts as the end of speech; the mic is resumed either way. */
-      SpeechSynthesis.prototype.cancel = function () {
-        if (this.speaking || this.pending) noteEnd(); else unmuteMic();
-        return origCancel();
-      };
     })();
   </script>
 </body>
