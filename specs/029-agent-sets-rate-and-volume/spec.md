@@ -1,5 +1,7 @@
 # 029 - The agent sets rate and volume for this window only
 
+Agents never pass `rate` or `volume` unless Mark asks for a speed or volume change in the conversation; omitting them keeps his saved setting (Mark 2026-10-01: an agent passed rate 1 and overrode his 1.3x slider).
+
 ## What it does
 
 The `tts` tool takes two optional numbers: `rate` (0.5 to 2, 1 is normal) and
