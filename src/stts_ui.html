@@ -1837,9 +1837,18 @@
         micAlive();
         mic.__fatal = false;
         try { origAbort.call(mic); } catch { }
-        setTimeout(() => { if (mic.__wanted && !mic.__paused) { try { origStart.call(mic); } catch { } } }, 300);
+        setTimeout(() => startMic(mic), 300);
       }, 15000);
       const origStart = SR.prototype.start, origStop = SR.prototype.stop, origAbort = SR.prototype.abort;
+      /* Spec 030. The ONE gate for turning a recognizer on. Every path that starts or resumes
+         the mic (listen, tts end, watchdogs, end-retry, unpause) goes through here, so Mark's
+         pause wins over all of them. Returns true if it started. */
+      function micMayRun(r) { return !!r && r.__wanted && !r.__fatal && !r.__paused && !(r === mic && muted); }
+      function startMic(r) {
+        if (!micMayRun(r)) return false;
+        origStart.call(r);
+        return true;
+      }
       let mic = null;             // the STT panel's recognizer, captured on its first start()
       let upstreamOnResult = null;
       SR.prototype.start = function () {
@@ -1869,8 +1878,7 @@
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
             // for the rest of the session. Retry with a widening delay, capped at 2 s.
             const retry = (delay) => setTimeout(() => {
-              if (!this.__wanted || this.__fatal || this.__paused) return;
-              try { origStart.call(this); } catch { if (delay < 2000) retry(Math.min(Math.max(delay * 2, 100), 2000)); }
+              try { startMic(this); } catch { if (delay < 2000) retry(Math.min(Math.max(delay * 2, 100), 2000)); }
             }, delay);
             retry(restartDelay(errStreak));
           });
@@ -1878,7 +1886,8 @@
         this.__wanted = true; this.__fatal = false;
         // Spec 030: mute is Mark's. A listen wants the mic, but while muted it stays off.
         if (this === mic && muted) { this.__paused = true; return; }
-        return origStart.call(this);
+        if (this === mic) this.__paused = false;   // a listen clears a stale speech pause; mute is checked above
+        startMic(this);
       };
       SR.prototype.stop = function () { this.__wanted = false; return origStop.call(this); };
       SR.prototype.abort = function () { this.__wanted = false; return origAbort.call(this); };
@@ -2257,7 +2266,7 @@
       const unmuteMic = () => {
         if (!mic || !mic.__paused || muted) return;
         mic.__paused = false;
-        if (mic.__wanted && !mic.__fatal) { try { origStart.call(mic); } catch { } }
+        try { startMic(mic); } catch { }
       };
 
       /* Spec 003/006: Space pauses and resumes the mic anywhere in the window, one press
@@ -2287,6 +2296,7 @@
       commandsBtn.insertAdjacentElement('afterend', pauseBtn);
       function setMuted(on) {
         muted = on;
+        micLog(on ? 'paused by Mark' : 'resumed by Mark');   // spec 030: every pause change is on record
         dictateBtn.classList.toggle('muted', on);
         sttStatus.classList.toggle('muted', on);
         pauseBtn.classList.toggle('paused', on);
@@ -2294,7 +2304,7 @@
         if (on) { clearTimeout(pauseTimer); clearTimeout(bargeTimer); }
         if (!mic) return;
         if (on) { mic.__paused = true; try { origAbort.call(mic); } catch { } }
-        else { mic.__paused = false; if (mic.__wanted && !mic.__fatal) { try { origStart.call(mic); } catch { } } }
+        else { mic.__paused = false; try { startMic(mic); } catch { } }
       }
       document.addEventListener('keydown', (e) => {
         if (e.key !== ' ' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
