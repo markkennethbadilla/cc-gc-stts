@@ -1254,37 +1254,6 @@
 
     gotitBtn.onclick = autoOrManualClose;
 
-    // Cut speech at every punctuation mark, so the first piece plays at once (stts spec 020,
-    // callbot spec 006). A cut needs a space beside the mark, which keeps 1,200 / 3.5 / 7:35,
-    // URLs and emails whole. Intl.Segmenter and sentence-splitter both cut "Mr. Smith", and a URL
-    // at its "?", so neither is used. ponytail: fixed abbreviation list; add one when it is misread.
-    function clauses(text) {
-      const t = String(text);
-      const abbr = /(?:^|\s)(?:mr|mrs|ms|dr|prof|st|jr|sr|vs|etc|no|approx|dept|inc|ltd|[a-z]|(?:[a-z]\.)+[a-z])\.$/i;
-      const pieces = [];
-      let start = 0;
-      const cut = (i) => { const p = t.slice(start, i).trim(); if (p) pieces.push(p); start = i; };
-      for (const m of t.matchAll(/\s+/g)) {
-        const i = m.index, prev = t[i - 1] || '', next = t.slice(i + m[0].length, i + m[0].length + 2);
-        const after = /[.,;:!?…)\]}"”»|\/—–-]/.test(prev) && !(prev === '.' && abbr.test(t.slice(start, i)));
-        const before = /^[([{"“«•|\/—–]/.test(next) || /^(?:[-*] |--)/.test(next);
-        if (m[0].includes('\n') || after || before) cut(i);
-      }
-      cut(t.length);
-      // Inside a word: after an em dash, en dash or pipe, and at a slash between two plain words.
-      const inner = /(?<=[—–|])(?=[\p{L}\p{N}])|(?<=(?:^|\s)\p{L}+\/)(?=\p{L}+[.,;:!?]?(?:\s|$))/u;
-      const out = [];
-      let carry = '';
-      for (const p of pieces.flatMap((p) => p.split(inner))) {
-        // A piece with no letter or digit (a lone dash, a bullet) goes with the next piece.
-        if (!/[\p{L}\p{N}]/u.test(p)) { carry += p + ' '; continue; }
-        out.push(carry + p);
-        carry = '';
-      }
-      if (carry.trim()) out.length ? (out[out.length - 1] += ' ' + carry.trim()) : out.push(carry.trim());
-      return out;
-    }
-
     function startSpeaking() {
       const textToSpeak = ttsTextarea.value.trim();
       if (hasStarted || !textToSpeak) return;
@@ -1304,12 +1273,12 @@
       synth.cancel();
 
 
-      // Spec 020. One utterance per piece of clauses(): the voice starts at the first comma,
-      // not after the whole sentence. Only the first piece's start and the last piece's end count.
-      const pieces = clauses(textToSpeak);
-      const utterances = pieces.map((p) => new SpeechSynthesisUtterance(p));
+      // Spec 022. One utterance per sentence (Intl.Segmenter, as toParts on the server), never per
+      // comma: every utterance boundary is an audible gap in Edge's speechSynthesis.
+      const sentences = [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(textToSpeak)]
+        .map((s) => s.segment.trim()).filter(Boolean);
+      const utterances = sentences.map((s) => new SpeechSynthesisUtterance(s));
       currentUtterance = utterances[utterances.length - 1];
-      const firstUtterance = utterances[0];
 
       const voice =
         voices.find((v) => v.lang === 'en-US') ||
@@ -1319,7 +1288,7 @@
 
       if (voice) utterances.forEach((u) => { u.voice = voice; });
 
-      firstUtterance.onstart = () => {
+      utterances[0].onstart = () => {
         ttsContainer.classList.add('speaking');
         bars.forEach((b) => b.classList.add('animating'));
       };
@@ -2277,7 +2246,7 @@
         setMuted(!muted);
       });
       const origCancel = synth.cancel.bind(synth);
-      /* Spec 020. A reply is several utterances; the mic resumes only after the last one. */
+      /* Spec 022. A reply is one utterance per sentence; the mic resumes only after the last. */
       const noteEnd = () => { if (synth.pending) return; speakEndedAt = Date.now(); unmuteMic(); };
       SpeechSynthesis.prototype.speak = ((wrapped) => function (u) {
         u.addEventListener('start', muteMic);
