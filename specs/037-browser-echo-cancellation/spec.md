@@ -21,7 +21,10 @@ In the fork script block of `src/stts_ui.html`, on load the page asks for
 `getUserMedia({audio: {echoCancellation, noiseSuppression, autoGainControl}})`.
 `startMic` passes that track to `SpeechRecognition.start(track)` (Chrome 135+,
 on-device recognition included). If the track is not live yet or ends, the
-recognizer uses the default mic and a new track is requested.
+recognizer uses the default mic and a new track is requested. When the track
+becomes ready, a session already running on the default mic is aborted so it
+restarts on the track (a running session never switches source; seen live
+2026-10-01). The track settings are logged.
 
 Chrome-wide echo cancellation removes everything Chrome plays. The Microsoft
 online voices (the default, spec 034) play through WebAudio in Chrome, so they
@@ -46,7 +49,7 @@ Evaluated and not adopted:
 
 ## What it reads and writes
 
-Reads the microphone through `getUserMedia`. Writes `echo-cancelled mic ready`
+Reads the microphone through `getUserMedia`. Writes `echo-cancelled mic ready {settings}` (`echoCancellation: true`)
 or `echo-cancelled mic failed` to daemon.log.
 
 ## How to run, check, and hand over

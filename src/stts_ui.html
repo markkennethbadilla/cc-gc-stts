@@ -1984,7 +1984,12 @@
       let aecTrack = null;
       function freshTrack() {
         navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-          .then(s => { aecTrack = s.getAudioTracks()[0]; aecTrack.onended = freshTrack; micLog('echo-cancelled mic ready'); })
+          .then(s => {
+            aecTrack = s.getAudioTracks()[0]; aecTrack.onended = freshTrack;
+            micLog('echo-cancelled mic ready ' + JSON.stringify(aecTrack.getSettings()));
+            // A session already running on the default mic never switches: abort it, the 'end' hook restarts it on this track.
+            if (mic && micRunning) { try { origAbort.call(mic); } catch { } }
+          })
           .catch(e => micLog('echo-cancelled mic failed ' + e.message));
       }
       freshTrack();
