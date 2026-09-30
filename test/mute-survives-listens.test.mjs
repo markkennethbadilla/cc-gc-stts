@@ -9,7 +9,7 @@ const html = readFileSync(new URL('../src/stts_ui.html', import.meta.url), 'utf8
 const grab = (re, what) => { const m = html.match(re); assert.ok(m, what + ' not found'); return m[0]; };
 const wrapper = grab(/SR\.prototype\.start = function \(\) \{[\s\S]*?\n {6}\};/, 'start wrapper');
 const gate = grab(/function micMayRun[\s\S]*?\n {6}\}\n/, 'start gate');
-const hooks = grab(/const muteMic = \(\) => \{[\s\S]*?\n {6}\};\n {6}const unmuteMic = \(\) => \{[\s\S]*?\n {6}\};/, 'speech hooks');
+const hooks = grab(/const unmuteMic = \(\) => \{[\s\S]*?\n {6}\};/, 'speech hooks');
 
 test('one gate: the raw start is called in exactly one place', () => {
   assert.equal(html.match(/origStart\.call\(/g).length, 1);
@@ -28,7 +28,7 @@ function page() {
     ${gate.replace(/\bmuted\b/g, 'env.muted')}
     ${wrapper.replace(/\bmuted\b/g, 'env.muted')}
     ${hooks.replace(/\bmuted\b/g, 'env.muted')}
-    return { speakStart: muteMic, speakEnd: unmuteMic };
+    return { speakStart: () => {}, speakEnd: unmuteMic };   // spec 032: speech no longer pauses the mic
   `)(SR, function () { starts++; }, env);
   return { rec: new SR(), env, starts: () => starts, ...api };
 }
@@ -72,10 +72,11 @@ test('pause pressed during playback holds after the speech ends', () => {
   assert.equal(p.starts(), 2, 'unpause still works');
 });
 
-test('not muted: speech end resumes the mic as before', () => {
+test('not muted: speech never stops the mic (spec 032)', () => {
   const p = page();
   p.rec.start(); p.speakStart(); p.speakEnd();
-  assert.equal(p.starts(), 2);
+  assert.equal(p.starts(), 1, 'no stop, so no restart and no start-up gap');
+  assert.notEqual(p.rec.__paused, true);
 });
 
 test('edge/stress: muted before the first listen, 1000 listens and replies capture nothing', () => {

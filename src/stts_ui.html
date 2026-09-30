@@ -1877,7 +1877,7 @@
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
-            if (this === mic) { micRunning = false; endedAt = Date.now(); saveIdleInterim(); }
+            if (this === mic) { micRunning = false; endedAt = Date.now(); echoIdx = -1; saveIdleInterim(); }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
             // for the rest of the session. Retry with a widening delay, capped at 2 s.
@@ -1986,6 +1986,17 @@
       let rawInterim = '';        // spec 027: the browser's whole open result, before the sent part is cut
       let pauseTimer = null;
       let speakEndedAt = 0;
+      /* Spec 032. echoIdx is the last result index heard while the agent spoke (speakers mode).
+         Such a result can run on into Mark's reply when he answers at once, so its leading
+         words that the agent just said are cut and the rest is kept. */
+      let echoIdx = -1;
+      function stripEcho(text) {
+        const spoken = new Set(norm(ttsTextarea.value));
+        const toks = text.trim().split(/\s+/);
+        let i = 0;
+        while (i < toks.length && norm(toks[i]).every(w => spoken.has(w))) i++;
+        return toks.slice(i).join(' ');
+      }
 
       const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
       function insert(text) {
@@ -2055,7 +2066,7 @@
          it is saying, heard while it speaks or just after. Anything else is Mark and is kept. */
       function ownVoice(text) {
         if (!synth.speaking && Date.now() - speakEndedAt > 1500) return false;
-        if (!bargeIn.checked) return true;   // speakers: anything heard while speaking is the agent
+        if (!bargeIn.checked && synth.speaking) return true;   // speakers: anything heard while speaking is the agent
         const spoken = new Set(norm(ttsTextarea.value));
         const words = content(text).length ? content(text) : norm(text);
         if (!words.length) return true;
@@ -2146,8 +2157,10 @@
 
       function onResult(event) {
         let finalText = '', interim = '';
+        if (!bargeIn.checked && synth.speaking) { echoIdx = event.results.length - 1; return; }   // spec 032
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const t = event.results[i][0].transcript;
+          let t = event.results[i][0].transcript;
+          if (i <= echoIdx) t = stripEcho(t);
           if (event.results[i].isFinal) finalText += t; else interim += t;
         }
         rawInterim = interim.trim();
@@ -2256,17 +2269,11 @@
       };
       let bargeTimer = null;
 
-      /* ---- speakers: mic off while the agent talks, on the instant it stops ----
-         With barge-in off the mic must not hear the agent at all, so the recognizer is aborted
-         (abort drops buffered audio; stop would still deliver it) when an utterance starts and
-         started again the moment it ends, errors or is cancelled. The 'end' hook above sees
-         __paused and does not auto-restart in between. */
-      const muteMic = () => {
-        if (bargeIn.checked || !mic || !mic.__wanted || mic.__paused) return;
-        saveIdleInterim();
-        mic.__paused = true;
-        try { origAbort.call(mic); } catch { }
-      };
+      /* ---- speakers: the mic stays on while the agent talks (spec 032) ----
+         Aborting it for the speech and starting it again at the end cost about a second of
+         recognizer start-up, and Mark's first words were lost (2026-10-01). Its own voice is
+         dropped in onResult while speaking and cut from the front of any result that runs on
+         past the end (stripEcho). unmuteMic resumes a mic paused for any other reason. */
       const unmuteMic = () => {
         if (!mic || !mic.__paused || muted) return;
         mic.__paused = false;
@@ -2320,7 +2327,6 @@
       /* Spec 022. A reply is one utterance per sentence; the mic resumes only after the last. */
       const noteEnd = () => { if (synth.pending) return; speakEndedAt = Date.now(); unmuteMic(); };
       SpeechSynthesis.prototype.speak = ((wrapped) => function (u) {
-        u.addEventListener('start', muteMic);
         u.addEventListener('end', noteEnd); u.addEventListener('error', noteEnd);
         return wrapped.call(this, u);
       })(SpeechSynthesis.prototype.speak);
