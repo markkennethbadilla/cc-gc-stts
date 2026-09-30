@@ -2140,6 +2140,20 @@
         return toks.slice(i).join(' ');
       }
 
+      /* Spec 036. On-device recognition can close the result for the agent's LAST clip after the
+         voice stopped, as a new result, so echoIdx never covers it ("Then say hello", 2026-10-01).
+         Within 5 s of the speech ending, any leading run of words that is a contiguous run of the
+         last 12 spoken words is cut; whatever follows is Mark's and is kept. */
+      function stripTail(text) {
+        if (!text || (!synth.speaking && Date.now() - speakEndedAt > 5000)) return text;
+        const tail = ' ' + norm(ttsTextarea.value).slice(-12).join(' ') + ' ';
+        const toks = text.trim().split(/\s+/);
+        for (let k = toks.length; k > 0; k--) {
+          const w = norm(toks.slice(0, k).join(' '));
+          if (w.length && tail.includes(' ' + w.join(' ') + ' ')) return toks.slice(k).join(' ');
+        }
+        return text;
+      }
       const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
       function insert(text) {
         if (!text) return;
@@ -2305,6 +2319,7 @@
           if (i <= echoIdx) t = stripEcho(t);
           if (event.results[i].isFinal) finalText += t; else interim += t;
         }
+        if (currentMode === 'stt') { finalText = stripTail(finalText); interim = stripTail(interim); }
         rawInterim = interim.trim();
         if (interim) interim = dedupe(interim, true);
         if (currentMode === 'stt') {
