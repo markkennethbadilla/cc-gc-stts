@@ -98,3 +98,8 @@ test('stt and tts tell the agent to listen again when a turn reads unfinished', 
   for (const f of ['../skills/stts/SKILL.md', '../commands/stts.md', '../commands/stts.toml'])
     assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /do not answer; listen again with idleSec 1 and join the pieces\. If that short listen returns __STTS_NO_SPEECH__, he has finished: answer what you have/, f);
 });
+
+test('a reply that would only repeat the last one is not spoken (Mark 2026-09-30)', () => {
+  for (const f of ['../src/stts-mcp-server.ts', '../commands/stts.md', '../commands/stts.toml'])
+    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /If your answer would only repeat what you said in your last reply .*do not speak at all: listen again silently\./, f);
+});
