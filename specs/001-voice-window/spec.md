@@ -20,7 +20,7 @@ being lost.
 - A small daemon on port 15986 owns the window. Any agent's tool call
   hands the daemon one request; the daemon shows it in the window and
   answers when Mark is done. One request at a time.
-- The window is Edge in app mode with its own profile under
+- The window is Chrome in app mode (spec 031) with its own profile under
   `%LOCALAPPDATA%\cc-gc-stts\profile`. Settings and history live there
   and survive restarts, disk cleanup, and switching agents.
 - The daemon and the page talk over one WebSocket. If a second copy of
@@ -62,8 +62,8 @@ being lost.
 - **Readable inactive panel.** The panel that is not active stays
   scrollable and selectable but read-only. Tab never moves focus out
   of the prompt box; a click on empty chrome never takes focus away.
-- **Edge fallback.** Chrome when installed, else any Chromium, else
-  Edge. A browser that refuses to start fails one request, not the
+- **Browser.** Chrome from Program Files, else any Chrome that
+  chrome-launcher finds. Never Edge (spec 031). A browser that refuses to start fails one request, not the
   daemon.
 - **Bring to front on request, live-process check.** A request raises
   the window; a dead browser process is relaunched instead of trusted.

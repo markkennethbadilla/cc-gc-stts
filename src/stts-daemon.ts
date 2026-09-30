@@ -57,22 +57,17 @@ function loadHtml(): string {
   return fs.readFileSync(path.resolve(__dirname, 'stts_ui.html'), 'utf-8');
 }
 
-// Edge first, always. The Microsoft Natural voices this window reads with are
-// an Edge feature: Chrome's speechSynthesis sees only the local SAPI voices, so
-// on a machine that had both, every Natural voice vanished from the picker, and
-// Chrome reusing the Edge-written profile dir reset the saved voice as well
-// (2026-09-19). Chrome remains the fallback where Edge is absent, which is the
-// original reason this function exists (ERR_LAUNCHER_NOT_INSTALLED).
+// Spec 031: Chrome, from Program Files. Edge was removed from this machine
+// (2026-10-01) and is banned by a house hook, so it is never looked for.
+// chrome-launcher's own search stays as the fallback (ERR_LAUNCHER_NOT_INSTALLED).
 function resolveBrowserPath(): string | undefined {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
-  const edges = [
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    '/usr/bin/microsoft-edge',
+  const chromes = [
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
   ];
-  const edge = edges.find((p) => fs.existsSync(p));
-  if (edge) return edge;
+  const chrome = chromes.find((p) => fs.existsSync(p));
+  if (chrome) return chrome;
   try {
     const found = ChromeLauncher.Launcher.getFirstInstallation();
     if (found) return found;

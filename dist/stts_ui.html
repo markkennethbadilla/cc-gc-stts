@@ -1297,13 +1297,17 @@
 
 
       // Spec 022. One utterance per sentence (Intl.Segmenter, as toParts on the server), never per
-      // comma: every utterance boundary is an audible gap in Edge's speechSynthesis.
+      // comma: every utterance boundary is an audible gap in the browser's speechSynthesis.
       const sentences = [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(textToSpeak)]
         .map((s) => s.segment.trim()).filter(Boolean);
       const utterances = sentences.map((s) => new SpeechSynthesisUtterance(s));
       currentUtterance = utterances[utterances.length - 1];
 
+      // Spec 031: in Chrome the best default is Google US English (a network voice, far
+      // more natural than the local SAPI David/Zira); offline it is absent and the
+      // first local en-US voice is used instead.
       const voice =
+        voices.find((v) => v.name === 'Google US English') ||
         voices.find((v) => v.lang === 'en-US') ||
         voices.find((v) => v.lang.startsWith('en-US')) ||
         voices.find((v) => v.lang.startsWith('en')) ||
@@ -1728,7 +1732,7 @@
       function fillVoices() {
         const voices = synth.getVoices();
         const saved = localStorage.getItem(LS_VOICE) || '';
-        voiceSelect.innerHTML = '<option value="">Default (first en-US voice)</option>' +
+        voiceSelect.innerHTML = '<option value="">Default (Google US English, else first en-US)</option>' +
           voices.map(v => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`).join('');
       }
       fillVoices();
@@ -1817,12 +1821,12 @@
       const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
 
       /* ---- watchdog ----
-         Edge ends a recognition session every minute or so and the 'end' hook restarts it, so a
+         the browser ends a recognition session every minute or so and the 'end' hook restarts it, so a
          healthy mic shows some event every minute even in silence. After a long quiet stretch it
          can instead wedge: no results, no 'end', nothing to restart from, and the window still
          says Listening while nothing is heard (Mark 2026-09-17). Anything over 90 s with no event
          is that wedge, so force a cycle. Costs nothing while the mic is healthy. */
-      /* Edge fires speechstart reliably and speechend hardly ever, so "is he still talking" is
+      /* the browser fires speechstart reliably and speechend hardly ever, so "is he still talking" is
          speechstart plus a transcript still arriving. Words stop arriving the moment he goes
          quiet, so the countdown starts from the last word, as it did before, and is only held
          back while sound is genuinely still being transcribed. */
@@ -1903,7 +1907,7 @@
       // activateStt is the one place a start is wanted; mic runs from then on.
       const origActivateStt = activateStt;
       activateStt = function (config) {
-        saveIdleInterim();   // spec 012: an idle utterance Edge has not finalised yet is kept, not wiped
+        saveIdleInterim();   // spec 012: an idle utterance the browser has not finalised yet is kept, not wiped
         prov = null; pendingInterim = '';
         origActivateStt(config);
         if (carry) { insert(carry); carry = ''; armPause(); }
@@ -1913,14 +1917,14 @@
 
       /* Spec 011. A listen whose recognizer has quietly died: the mic icon said listening, Mark
          talked, nothing was written, and the request ran to its 240 s timeout (2026-09-28, five
-         times). Only a new window fixed it. Edge's recognizer can stop with no error and no
+         times). Only a new window fixed it. the browser's recognizer can stop with no error and no
          'end' (web-speech-api#96, SO 38702797), and a spoken reply's 'end' can go missing
          (SO 54861046), which left __paused set so nothing ever restarted it. While a listen is
          pending, check every 2 s and restart the recognizer if it is not running, if it heard
          speech but wrote no words for 8 s, or if it has had no audio and no words for 15 s.
          Every restart and every recognizer error goes to daemon.log. */
       let micRunning = false, endedAt = 0, heardAt = Date.now(), errStreak = 0, lastErrAt = 0, restarts = 0;
-      /* Spec 019. Edge ends a session with error 'network' about once a minute even in silence, so
+      /* Spec 019. the browser ends a session with error 'network' about once a minute even in silence, so
          the streak climbed all day and each restart waited up to 5 s, deaf, while Mark talked. Now
          a recognizer that ended restarts at once; only errors less than 10 s apart widen the wait. */
       function restartDelay(n) { return n <= 1 ? 0 : Math.min(250 * 2 ** (n - 2), 2000); }
@@ -1979,7 +1983,7 @@
       let pendingInterim = '';    // latest interim text not yet final
       let flushed = '';           // interim text already sent, so its final is dropped
       let flushedAt = 0;
-      let rawInterim = '';        // spec 027: Edge's whole open result, before the sent part is cut
+      let rawInterim = '';        // spec 027: the browser's whole open result, before the sent part is cut
       let pauseTimer = null;
       let speakEndedAt = 0;
 
@@ -2057,11 +2061,11 @@
         if (!words.length) return true;
         return words.filter(w => !spoken.has(w)).length / words.length <= 0.34;
       }
-      /* Spec 027. Edge's open result carries the WHOLE utterance so far, on every interim and on
+      /* Spec 027. the browser's open result carries the WHOLE utterance so far, on every interim and on
          its final. Once part of it was sent (auto-send, or the 1 s check listen of spec 023),
          every later interim and the final repeated that part, so the next listen returned it
          again (Mark 2026-09-30). Cut what was sent from interims AND the final; only a final (the
-         result closing) forgets it. A final Edge re-worded ("OK" vs "okay") is cut after the sent
+         result closing) forgets it. A final the browser re-worded ("OK" vs "okay") is cut after the sent
          part's last three words; if they are not found the text is kept whole, because a repeat
          is better than a lost word (spec 019). */
       function dedupe(text, keep) {
@@ -2082,7 +2086,7 @@
       // Send interim text now instead of waiting for Chrome to finalise it, which for a lone
       // short word can take until the next thing is said. The later final is deduped.
       /* ---- live interim text ----
-         Edge finalises an utterance late: often only when the next one starts, or after a long
+         the browser finalises an utterance late: often only when the next one starts, or after a long
          pause. With finals alone the box stays empty while Mark talks, then fills after the
          pause, and a short second utterance looks dropped until a third pause lands it (Mark
          2026-09-09: "clunky"). So the latest interim is written into the box as a provisional
@@ -2190,7 +2194,7 @@
         armBarge();
       }
       /* Spec 012. Speech between tool calls reached the agent as "Thank you." and nothing else
-         (2026-09-28): Edge held the long utterance before it as interim text, and the abort that
+         (2026-09-28): the browser held the long utterance before it as interim text, and the abort that
          mutes the mic when the agent speaks (or a mic restart) drops interim audio for good. So
          the latest idle interim is moved into carry before anything can discard it: on every
          recognizer end, before every abort, and when a listen starts. A final that lands later
