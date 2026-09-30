@@ -90,6 +90,8 @@ test('stt and tts tell the agent to listen again when a turn reads unfinished', 
   assert.match(server, /A turn can arrive mid-thought\. If the transcript reads unfinished/);
   assert.match(server, /NO_SLEEP_NOTE \+\s*midThought\('call stt again'\)/);
   assert.match(server, /NO_SLEEP_NOTE \+\s*midThought\('listen again \(stt\)'\)/);
+  assert.match(server, /listen again with idleSec 1 and join the pieces; if that returns \$\{NO_SPEECH\}, answer what you have/);
+  assert.match(server, /The one exception \(spec 023\): a listen made only because a turn reads unfinished passes idleSec 1/);
   for (const f of ['../skills/stts/SKILL.md', '../commands/stts.md', '../commands/stts.toml'])
-    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /do not answer; listen again and join the pieces/, f);
+    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /do not answer; listen again with idleSec 1 and join the pieces\. If that short listen returns __STTS_NO_SPEECH__, he has finished: answer what you have/, f);
 });

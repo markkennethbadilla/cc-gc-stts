@@ -55,16 +55,17 @@ const listenFor = (idle: number | undefined, timeoutMs: number) =>
 const NO_SLEEP_NOTE =
   ' Never sleep or block on another tool to wait for him: to wait, call stt again (the default ' +
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
-  'Always use the default idleSec and never pass a short one: a background result arrives on its own and interrupts the listen.';
+  'Use the default idleSec for every normal wait: a background result arrives on its own and interrupts the listen. ' +
+  'The one exception (spec 023): a listen made only because a turn reads unfinished passes idleSec 1.';
 // Spec 019: a turn is sent after 0.7 s of quiet (2.2 s when it trails off), and the agent
 // judges whether the thought is finished; when unsure, it listens again rather than answer.
 const midThought = (again: string) =>
   ' A turn can arrive mid-thought. If the transcript reads unfinished (trails off, ends on a connector ' +
-  `like 'and', 'so', 'but', 'because', 'like', 'um', a half sentence, or a dangling clause), do not answer; ${again} and join the pieces. ` +
-  'When in doubt, listen again: he would rather wait a moment than be cut off. Answer only when the thought is complete enough.';
+  `like 'and', 'so', 'but', 'because', 'like', 'um', a half sentence, or a dangling clause), do not answer; ${again} with idleSec 1 and join the pieces. ` +
+  `If that short listen returns ${NO_SPEECH}, he has finished: answer what you have. Answer only when the thought is complete enough.`;
 // Spec 019: the returned text says so too, when its last word reads unfinished.
 const UNFINISHED_NOTE =
-  'This reads unfinished (it ends mid-thought). Unless it is clearly complete, do not answer: listen again and join the pieces.';
+  `This reads unfinished (it ends mid-thought). Unless it is clearly complete, do not answer: listen again with idleSec 1 and join the pieces; if that returns ${NO_SPEECH}, answer what you have.`;
 const heardReply = (heard: string, ...more: string[]) =>
   reply(heard, ...(readsUnfinished(heard) && !heard.startsWith('__STTS_') ? [UNFINISHED_NOTE] : []), ...more);
 
