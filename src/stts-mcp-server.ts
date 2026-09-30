@@ -116,10 +116,12 @@ server.registerTool(
       part: z.number().int().min(1).optional().describe('Start at this part of long content (1 is the start). Use the number a previous call returned.'),
       listen: z.boolean().optional().describe('After speaking, listen and return the next transcript'),
       close: z.boolean().optional().describe('Close the voice window after speaking. Use on the last message of a conversation, never with listen.'),
+      rate: z.number().min(0.5).max(2).optional().describe('Speaking rate for this voice window only, from this call until it closes (1 is normal). Never saved as his default.'),
+      volume: z.number().min(0).max(1).optional().describe('Volume 0 to 1 for this voice window only, from this call until it closes. Never saved as his default.'),
       idleSec,
     },
   },
-  async ({ text, file, url, part, listen, close, idleSec }) => {
+  async ({ text, file, url, part, listen, close, idleSec, rate, volume }) => {
     const t0 = Date.now();
     const left = () => CALL_BUDGET_MS - (Date.now() - t0);
     if ([text, file, url].filter((v) => v !== undefined).length !== 1) {
@@ -143,6 +145,8 @@ server.registerTool(
         oneshot: true,
         close: !!close && !listen && last,
         timeoutMs: left(),
+        rate,
+        volume,
       });
       if (r === STOPPED) { stopped = true; break; }
     }

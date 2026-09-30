@@ -43,6 +43,8 @@ export interface TtsConfig {
   oneshot: boolean;
   close?: boolean;
   timeoutMs?: number;
+  rate?: number;    // spec 029
+  volume?: number;  // spec 029
 }
 
 type PingResult = 'ours' | 'foreign' | 'closed';

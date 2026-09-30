@@ -1755,7 +1755,17 @@
         rateRange.value = v;
         rateVal.textContent = v.toFixed(1) + 'x';
       }
-      rateRange.oninput = () => setRate(rateRange.valueAsNumber);
+      rateRange.oninput = () => { live.rate = null; setRate(rateRange.valueAsNumber); };
+      /* Spec 029. A tts request may carry rate and volume for this window only: kept in memory
+         until the window closes or he moves the slider, never saved as his default. */
+      const live = { rate: null, volume: null };
+      function applyLive(config) {
+        const n = (v, lo, hi) => (typeof v === 'number' && isFinite(v) ? Math.min(hi, Math.max(lo, v)) : null);
+        const r = n(config.rate, 0.5, 2), vol = n(config.volume, 0, 1);
+        if (r !== null) live.rate = r;
+        if (vol !== null) live.volume = vol;
+        return live;
+      }
 
 
       const origSpeak = SpeechSynthesis.prototype.speak;
@@ -1763,7 +1773,8 @@
         const name = localStorage.getItem(LS_VOICE);
         const v = name && this.getVoices().find(x => x.name === name);
         if (v && u.text) u.voice = v;
-        if (u.text) u.rate = rate();
+        if (u.text) u.rate = live.rate ?? rate();
+        if (u.text && live.volume !== null) u.volume = live.volume;
         return origSpeak.call(this, u);
       };
 
@@ -1945,6 +1956,7 @@
       }
       const origActivateTts = activateTts;
       activateTts = function (config) {
+        if (applyLive(config).rate !== null) rateVal.textContent = live.rate.toFixed(1) + 'x (this window)';
         const r = withSuppressed(origActivateTts)(config);
         if (!isRecording) { try { origToggle(); } catch { } }
         return r;

@@ -20,6 +20,8 @@ type RequestConfig = {
   initialText?: string;
   startRecording?: boolean;
   text?: string;
+  rate?: number;         // spec 029: tts only, this window instance only, never saved
+  volume?: number;       // spec 029: 0 to 1, same
   oneshot?: boolean;
   close?: boolean;       // spec 004: close the window once this request is answered
   idleSec?: number;      // spec 010: stt only, answer NO_SPEECH after this long with nothing heard
