@@ -2,11 +2,11 @@
 
 ## What it does
 
-- The voice window sends what Mark said after 0.7 seconds of silence, so a
+- The voice window sends what Mark said after 0.1 seconds of silence, so a
   finished turn reaches the agent fast. When what he said so far reads
   unfinished (its last word is "and", "so", "but", "because", "um", "the",
   "to", a lead-in like "so I was thinking"), the window waits the longer hold,
-  2.2 seconds, before sending. Both are settings in the window.
+  1 second, before sending. Both are settings in the window.
 - The agent still judges whether the thought is finished: a turn that reads
   unfinished gets no answer; the agent listens again and joins the pieces. When
   the returned transcript ends on such a word, the tool result says so too.
@@ -26,7 +26,7 @@ Three causes, all in the page:
 1. Auto-send fired after 2 s of silence, so a thinking pause split a sentence
    into two messages, each answered. A longer timer (3.5 s) made every turn
    slow to send, so Mark moved to a 1 s timer with the completeness judgment in
-   the agent. Later the same day he asked for 0.7 s, and: "Continue listening
+   the agent. Later the same day he asked for 0.7 s, then 0.1 s after trying it (the callbot followed, its spec 005), and: "Continue listening
    rather than respond when it suspects I wasn't done speaking. Bias towards
    that so I'm never cut off." The short pause is safe only because an
    unfinished-sounding turn gets the long hold.
@@ -40,12 +40,12 @@ Three causes, all in the page:
 
 ## How it works
 
-- **Pause.** `PAUSE_DEFAULT_MS = 700` in `src/stts_ui.html`, saved in the
+- **Pause.** `PAUSE_DEFAULT_MS = 100` in `src/stts_ui.html`, saved in the
   window's `localStorage` (`__stts__autosend_ms`). `migratePause` runs once per
-  profile: a saved `3500`, `2000` or `1000` (earlier defaults) becomes `700`,
-  then the marker `__stts__autosend_ms_v4` is written, so a value Mark sets
+  profile: a saved `3500`, `2000`, `1000` or `700` (earlier defaults) becomes `100`,
+  then the marker `__stts__autosend_ms_v5` is written, so a value Mark sets
   later is never changed again.
-- **Hold.** `HOLD_DEFAULT_MS = 2200`, saved as `__stts__hold_ms`, set in the
+- **Hold.** `HOLD_DEFAULT_MS = 1000` (Mark 2026-09-30: 2.2 s felt slow; a saved 2200 moves to 1000 once), saved as `__stts__hold_ms`, set in the
   Auto-send row ("s if it trails off"). `readsUnfinished(text)` checks the last
   word against one fixed list (connectors, fillers, prepositions, articles,
   pronouns, lead-ins); the same list is in `src/protocol.ts` and in the call
@@ -77,8 +77,9 @@ Three causes, all in the page:
 
 | Behavior | stts | callbot (its spec 005) | Why they differ |
 | --- | --- | --- | --- |
-| Silence before a turn is sent | 0.7 s, a setting in the window (a saved 3.5, 2 or 1 s moves to 0.7 once) | 0.7 s default, `CALLBOT_PAUSE_MS` | stts keeps a per-window saved setting; the call bot has an env var |
-| When the turn reads unfinished | Waits 2.2 s, a setting in the window | Waits 2.2 s, `CALLBOT_HOLD_MS` | Same |
+| Silence before a turn is sent | 0.1 s, a setting in the window (a saved 3.5, 2, 1 or 0.7 s moves to 0.1 once) | 0.1 s default, `CALLBOT_PAUSE_MS` | stts keeps a per-window saved setting; the call bot has an env var |
+| When the turn reads unfinished | Waits 1 s, a setting in the window | No hold; the agent listens again with idleSec 1 (its spec 008) | Channel: Recall's speech events already mark end of speech, so the call bot leaves the unfinished judgment to the agent |
+| A transcript that repeats one already answered | Treated as late delivery: not answered again, the agent listens silently (tool descriptions, `/stts`) | The same, in `call_listen` and `call_say` | Same (Mark 2026-09-30) |
 | What counts as unfinished | Last word in one fixed list | The same list | Same; neither recognizer punctuates reliably, so the last word is the signal |
 | The agent is told | Tool descriptions, and a note on the returned transcript | The same | Same |
 | Recognizer restart after an error | At once, backoff only on rapid repeats | Not applicable | The call bot has no recognizer of its own; Recall transcribes on its servers |
@@ -88,7 +89,7 @@ Three causes, all in the page:
 ## What it reads and writes
 
 - Reads and writes `__stts__autosend_ms`, `__stts__hold_ms` and the one-time
-  marker `__stts__autosend_ms_v4` in the voice window's `localStorage`.
+  marker `__stts__autosend_ms_v5` in the voice window's `localStorage`.
 - Writes nothing new to disk. Recognizer errors and restarts still go to
   `daemon.log` (spec 011).
 
@@ -100,15 +101,15 @@ node --test test/*.test.mjs
 ```
 
 `test/speech-not-split.test.mjs` lifts code out of the real page: the default
-pause is 0.7 s; a saved 3.5, 2 or 1 s moves once and a later choice stays;
+pause is 0.1 s; a saved 3.5, 2, 1 or 0.7 s moves once and a later choice stays;
 "and", "so i was thinking", "because the", "we could um" and "I went to the"
-get the 2.2 s hold while finished sentences get 0.7 s, three rounds, and the
+get the 1 s hold while finished sentences get 0.1 s, three rounds, and the
 page's list and `protocol.ts` agree on every case; both timers use `quietMs`;
 the first restart waits 0 ms and the cap is 2 s; short or unfinished words
 from Mark are kept while the agent's own words are dropped. The whole suite
 was run three times, all green.
 
-Live check: the Talk panel shows `0.7` s and `2.2` s; saying "so I was
+Live check: the Talk panel shows `0.1` s and `1` s; saying "so I was
 thinking" and pausing a second does not send.
 
 Hand over: this spec, `migratePause`, `readsUnfinished`, `quietMs`,

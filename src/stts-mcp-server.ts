@@ -57,12 +57,12 @@ const NO_SLEEP_NOTE =
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
   'Use the default idleSec for every normal wait: a background result arrives on its own and interrupts the listen. ' +
   'The one exception (spec 023): a listen made only because a turn reads unfinished passes idleSec 1.';
-// Spec 019: a turn is sent after 0.7 s of quiet (2.2 s when it trails off), and the agent
+// Spec 019: a turn is sent after 0.1 s of quiet (1 s when it trails off), and the agent
 // judges whether the thought is finished; when unsure, it listens again rather than answer.
 const midThought = (again: string) =>
   ' A turn can arrive mid-thought. If the transcript reads unfinished (trails off, ends on a connector ' +
   `like 'and', 'so', 'but', 'because', 'like', 'um', a half sentence, or a dangling clause), do not answer; ${again} with idleSec 1 and join the pieces. ` +
-  `If that short listen returns ${NO_SPEECH}, he has finished: answer what you have. Answer only when the thought is complete enough.`;
+  `If that short listen returns ${NO_SPEECH}, he has finished: answer what you have. Answer only when the thought is complete enough. If a transcript repeats something you already answered, it is the same speech delivered late: do not answer it again; listen again silently.`;
 // Spec 019: the returned text says so too, when its last word reads unfinished.
 const UNFINISHED_NOTE =
   `This reads unfinished (it ends mid-thought). Unless it is clearly complete, do not answer: listen again with idleSec 1 and join the pieces; if that returns ${NO_SPEECH}, answer what you have.`;

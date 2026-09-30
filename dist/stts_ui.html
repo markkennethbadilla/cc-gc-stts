@@ -1530,19 +1530,20 @@
         const legacy = localStorage.getItem(LS_BARGE_IN);
         if (legacy !== null) localStorage.setItem(LS_HEADPHONE_MODE, legacy);
       }
-      /* Spec 019. Auto-send after 0.7 s of quiet (Mark 2026-09-30), or after the longer hold
+      /* Spec 019. Auto-send after 0.1 s of quiet (Mark 2026-09-30), or after the longer hold
          when what he said so far reads unfinished (readsUnfinished below); the agent still judges
-         whether the thought is finished and listens again to join the pieces. A saved 3.5 s, 2 s or
-         1 s (earlier defaults, never a choice) moves to 0.7 s once. A value Mark sets later is left
+         whether the thought is finished and listens again to join the pieces. A saved 3.5 s, 2 s,
+         1 s or 0.7 s (earlier defaults, never a choice) moves to 0.1 s once, and a saved 2.2 s hold moves to 1 s. A value Mark sets later is left
          alone: the marker makes this run one time. */
-      const PAUSE_DEFAULT_MS = 700;
-      const HOLD_DEFAULT_MS = 2200;
+      const PAUSE_DEFAULT_MS = 100;
+      const HOLD_DEFAULT_MS = 1000;
       const LS_HOLD_MS = '__stts__hold_ms';
       function migratePause(ls) {
-        if (ls.getItem('__stts__autosend_ms_v4') !== null) return;
+        if (ls.getItem('__stts__autosend_ms_v5') !== null) return;
         const saved = ls.getItem(LS_AUTOSEND_MS);
-        if (saved === '3500' || saved === '2000' || saved === '1000') ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
-        ls.setItem('__stts__autosend_ms_v4', '1');
+        if (['3500', '2000', '1000', '700'].includes(saved)) ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
+        if (ls.getItem('__stts__hold_ms') === '2200') ls.setItem('__stts__hold_ms', '1000');
+        ls.setItem('__stts__autosend_ms_v5', '1');
       }
       /* Spec 019 (Mark 2026-09-30): "never cut me off." The same list as protocol.ts and the call
          bot's turn.mjs (rule 67). */
@@ -1745,14 +1746,14 @@
 
       /* ---- settings ---- */
       const auto = checkbox(sttContainer, 'Auto-send', 'autosend-on',
-        'after <input type="number" class="history-select" id="autosend-sec" min="0.3" step="0.1" style="flex:0 0 4.5em;cursor:text"> s of silence, ' +
+        'after <input type="number" class="history-select" id="autosend-sec" min="0.1" step="0.1" style="flex:0 0 4.5em;cursor:text"> s of silence, ' +
         '<input type="number" class="history-select" id="hold-sec" min="0.3" step="0.1" style="flex:0 0 4.5em;cursor:text"> s if it trails off',
         LS_AUTOSEND, true);
       const autoOn = auto.box;
       const autoSec = auto.bar.querySelector('#autosend-sec');
       const pauseMs = () => Number(localStorage.getItem(LS_AUTOSEND_MS)) || PAUSE_DEFAULT_MS;
       autoSec.value = pauseMs() / 1000;
-      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(300, autoSec.valueAsNumber * 1000 || PAUSE_DEFAULT_MS)));
+      autoSec.onchange = () => localStorage.setItem(LS_AUTOSEND_MS, String(Math.max(100, autoSec.valueAsNumber * 1000 || PAUSE_DEFAULT_MS)));
       const holdSec = auto.bar.querySelector('#hold-sec');
       const holdMs = () => Number(localStorage.getItem(LS_HOLD_MS)) || HOLD_DEFAULT_MS;
       holdSec.value = holdMs() / 1000;
