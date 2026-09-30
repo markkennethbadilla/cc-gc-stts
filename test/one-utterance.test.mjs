@@ -1,4 +1,4 @@
-// Spec 022. The window cuts speech only at sentence ends, and the agent is told to write only periods.
+// Spec 022/033. Upstream utterances per sentence (now each cut into clips by the spec 034 shim); guidance per spec 034.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -7,7 +7,7 @@ const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const sentences = (t) => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(t)]
   .map((s) => s.segment.trim()).filter(Boolean);
 
-test('sentence cuts only, one utterance per sentence, guidance asks for periods only', () => {
+test('sentence cuts only, one utterance per sentence, guidance asks for many marks (spec 034)', () => {
   for (let round = 0; round < 3; round++) {
     for (const f of ['src/stts_ui.html', 'dist/stts_ui.html']) {
       const html = read(f);
@@ -27,7 +27,7 @@ test('sentence cuts only, one utterance per sentence, guidance asks for periods 
     assert.deepEqual(sentences('no period at all'), ['no period at all']);
     assert.deepEqual(sentences('   '), []);
     for (const f of ['commands/stts.md', 'commands/stts.toml', 'src/stts-mcp-server.ts']) {
-      assert.match(read(f).replace(/'\s*\+\s*'/g, ''), /Use only periods, (and )?sparingly/, f);
+      assert.match(read(f).replace(/'\s*\+\s*'/g, ''), /use as MANY ?punctuation marks as read naturally/, f);
     }
   }
 });

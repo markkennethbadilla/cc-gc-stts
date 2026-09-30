@@ -1589,6 +1589,112 @@
         return UNFINISHED_END.has(words[words.length - 1]);
       }
       migratePause(localStorage);
+
+      /* ---- spec 034: Microsoft online voices, the call bot's way ----
+         speechSynthesis.speak/cancel/speaking/pending are replaced, so upstream and the rest of
+         this block (rate, barge-in, echo filter, mic on the last clip) keep working unchanged.
+         Each utterance is cut at every punctuation mark by the daemon (/edge/split, the call
+         bot's clauses()), up to three clips render ahead while one plays (/edge/clip,
+         edge-tts-universal), and each clip plays without Edge's leading and trailing silence.
+         A clip that fails to render is spoken by the browser's own voice instead. */
+      const EDGE_DEFAULT = 'en-US-AvaMultilingualNeural';
+      const RENDER_AHEAD = 3;
+      const SS = SpeechSynthesis.prototype;
+      const nativeSpeak = SS.speak, nativeCancel = SS.cancel;
+      const nativeSpeaking = Object.getOwnPropertyDescriptor(SS, 'speaking').get;
+      let edgeVoices = [];
+      fetch('/edge/voices').then(r => (r.ok ? r.json() : [])).then(v => {
+        edgeVoices = v;
+        // A voice saved by its SAPI-adapter name ("Microsoft Ava Online (Natural) - ...") moves to Edge's.
+        const s = localStorage.getItem(LS_VOICE), hit = s && v.find(x => x.friendly === s);
+        if (hit) localStorage.setItem(LS_VOICE, hit.name);
+        window.dispatchEvent(new Event('edgevoices'));
+      }).catch(() => { });
+      function edgeVoiceFor() {
+        const s = localStorage.getItem(LS_VOICE);
+        if (!s) return EDGE_DEFAULT;
+        const v = edgeVoices.find(x => x.name === s || x.friendly === s);
+        return v ? v.name : /Neural$/.test(s) ? s : null;   // a browser voice was picked
+      }
+      const audio = new AudioContext();
+      const clips = [];   // {item, text, last, p}
+      let splits = 0, gen = 0, cur = null, running = false, src = null, splitChain = Promise.resolve();
+      const fire = (u, type, extra) => u.dispatchEvent(Object.assign(new Event(type), extra));
+      function render(c) {
+        if (c.p) return;
+        const q = new URLSearchParams({ text: c.text, voice: c.item.voice, rate: c.item.rate, volume: c.item.volume });
+        c.p = fetch('/edge/clip?' + q).then(async r => {
+          if (!r.ok) throw new Error(await r.text());
+          const from = Number(r.headers.get('X-Speech-From')) || 0, to = Number(r.headers.get('X-Speech-To')) || Infinity;
+          return { buf: await audio.decodeAudioData(await r.arrayBuffer()), from, to };
+        });
+        c.p.catch(() => { });
+      }
+      function playBuf({ buf, from, to }) {
+        return new Promise(done => {
+          if (audio.state === 'suspended') audio.resume();
+          src = audio.createBufferSource();
+          src.buffer = buf; src.connect(audio.destination); src.onended = done;
+          const start = Math.min(from, buf.duration);
+          src.start(0, start, Math.max(0, Math.min(to, buf.duration) - start));
+        });
+      }
+      function playNative(c) {
+        return new Promise(done => {
+          const n = new SpeechSynthesisUtterance(c.text);
+          n.rate = c.item.rate; n.volume = c.item.volume;
+          if (c.item.u.voice) n.voice = c.item.u.voice;
+          n.onend = n.onerror = done;
+          nativeSpeak.call(speechSynthesis, n);
+        });
+      }
+      async function pump() {
+        if (running) return;
+        running = true;
+        const mine = gen;
+        try {
+          while (clips.length && mine === gen) {
+            clips.slice(0, RENDER_AHEAD + 1).forEach(render);
+            const c = clips[0];
+            let a = null;
+            try { a = await c.p; } catch (e) { console.warn('edge clip failed, browser voice instead:', e.message); }
+            if (mine !== gen) break;
+            clips.shift();
+            cur = c;
+            fire(c.item.u, 'start');   // per clip, so the mic starts on the LAST clip (spec 032)
+            await (a ? playBuf(a) : playNative(c));
+            if (mine !== gen) break;
+            cur = null;
+            if (c.last) fire(c.item.u, 'end');
+          }
+        } finally {
+          running = false;
+          if (mine !== gen && clips.length) pump();
+        }
+      }
+      Object.defineProperty(speechSynthesis, 'speaking', { get: () => !!cur || clips.length > 0 || splits > 0 || nativeSpeaking.call(speechSynthesis) });
+      Object.defineProperty(speechSynthesis, 'pending', { get: () => clips.length > 0 || splits > 0 });
+      SS.speak = function (u) {
+        const voice = u.text && edgeVoiceFor();
+        if (!voice) return nativeSpeak.call(this, u);
+        const item = { u, voice, rate: u.rate, volume: u.volume, gen };
+        splits++;
+        const parts = fetch('/edge/split', { method: 'POST', body: u.text }).then(r => r.json()).catch(() => [u.text]);
+        splitChain = splitChain.then(() => parts).then(ps => {
+          if (item.gen !== gen) return;   // cancelled: cancel already zeroed splits
+          splits--;
+          if (!ps.length) return;
+          ps.forEach((text, i) => clips.push({ item, text, last: i === ps.length - 1 }));
+          pump();
+        });
+      };
+      SS.cancel = function () {
+        const cut = new Set([cur, ...clips].filter(Boolean).map(c => c.item.u));
+        gen++; clips.length = 0; cur = null; splits = 0; splitChain = Promise.resolve();
+        if (src) { src.onended?.(); try { src.stop(); } catch { } src = null; }
+        cut.forEach(u => fire(u, 'error', { error: 'interrupted' }));
+        return nativeCancel.call(this);
+      };
       // The reverted PWA build left a service worker registered in the profile; it would keep
       // serving the page it cached over any newer build. Drop it.
       if (navigator.serviceWorker) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
@@ -1738,11 +1844,15 @@
       function fillVoices() {
         const voices = synth.getVoices();
         const saved = localStorage.getItem(LS_VOICE) || '';
-        voiceSelect.innerHTML = '<option value="">Default (Google US English, else first en-US)</option>' +
-          voices.map(v => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`).join('');
+        const opt = (v) => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`;
+        // Spec 034: the Microsoft online voices (all English locales) first; browser voices are the offline fallback.
+        voiceSelect.innerHTML = `<option value="">Default (${EDGE_DEFAULT})</option>` +
+          (edgeVoices.length ? '<optgroup label="Microsoft online">' + edgeVoices.map(opt).join('') + '</optgroup>' : '') +
+          '<optgroup label="Browser (offline)">' + voices.map(opt).join('') + '</optgroup>';
       }
       fillVoices();
       synth.addEventListener('voiceschanged', fillVoices);
+      window.addEventListener('edgevoices', fillVoices);
       voiceSelect.onchange = () => localStorage.setItem(LS_VOICE, voiceSelect.value);
 
       /* ---- speaking rate, 0.5x to 2x ---- */

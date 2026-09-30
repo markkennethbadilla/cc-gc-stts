@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
 import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED } from './protocol.ts';
+import { handleEdge } from './edge.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -239,6 +240,8 @@ const server = http.createServer(async (req, res) => {
     res.end(loadHtml());
     return;
   }
+
+  if (await handleEdge(req, res, url)) return;   // spec 034
 
   if (req.method === 'GET' && url.pathname === '/api/ping') {
     res.writeHead(200);

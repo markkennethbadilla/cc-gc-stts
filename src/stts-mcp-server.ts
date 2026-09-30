@@ -95,9 +95,9 @@ server.registerTool(
       'Speak aloud in the voice window. Pass the words as text, or, to read out content that already ' +
       'exists (a story, a chapter, notes, a document), pass file (a local path) or url (plain text or ' +
       'markdown, not an HTML page) instead of copying it into text: the server reads and speaks it, so ' +
-      'you do not spend output on it. Use only periods, sparingly, one at the end of each complete thought: ' +
-      'no commas, colons, semicolons, dashes or parentheses, since each is an audible pause in this ' +
-      'voice. Replace them with connector words (and, so, then, but, because, which), never just drop them. Markdown files are read without their markup. Long content is ' +
+      'you do not spend output on it. Keep spoken replies as short phrases and use as MANY ' +
+      'punctuation marks as read naturally: every mark cuts a small clip that is rendered and played the ' +
+      'moment it is ready (the same rule as the call bot). Markdown files are read without their markup. Long content is ' +
       'read in parts; if the call returns before the end, it says which part to pass next. The Stop ' +
       'button stops the reading and it says where. No spoken word is a command, and talking over ' +
       'your voice does not stop it: it finishes, and his words come back on the next listen. With ' +
