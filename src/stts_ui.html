@@ -1973,7 +1973,17 @@
       if (SR.available) SR.available(LOCAL).then(st => {
         micLog('on-device en-US: ' + st);
         if (st === 'available') local = true;
-        else if (st !== 'unavailable') SR.install(LOCAL).then(ok => { micLog('on-device install ' + ok); local = !!ok; }).catch(e => micLog('on-device install failed ' + e.message));
+        else if (st !== 'unavailable') {   // install() needs a user gesture: take the first one in the window
+          const hint = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'local-hint', textContent: 'Click anywhere to enable local speech' }));
+          hint.style.cssText = 'position:fixed;bottom:8px;right:12px;font-size:12px;opacity:.8;z-index:9999';
+          const go = () => {
+            ['pointerdown', 'keydown'].forEach(t => removeEventListener(t, go, true));
+            hint.textContent = 'Installing local speech...';
+            SR.install(LOCAL).then(ok => { micLog('on-device install ' + ok); local = !!ok; hint.remove(); })
+              .catch(e => { micLog('on-device install failed ' + e.message); hint.remove(); });
+          };
+          ['pointerdown', 'keydown'].forEach(t => addEventListener(t, go, true));
+        }
       }).catch(() => { });
       function startMic(r) {
         if (!micMayRun(r)) return false;

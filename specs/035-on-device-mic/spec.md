@@ -19,8 +19,9 @@ server session to end.
 
 In the fork script block of `src/stts_ui.html`: on load,
 `SpeechRecognition.available({langs:['en-US'], processLocally:true})` is
-checked and logged. `available` turns on-device on; `downloadable` asks Chrome
-to `install()` the pack and stays on cloud until it lands. `startMic` sets
+checked and logged. `available` turns on-device on; `downloadable` shows "Click anywhere to enable local speech"
+and calls `install()` on the first click or key press in the window (Chrome
+requires a user gesture); cloud is used until the pack lands. `startMic` sets
 `processLocally` on every start. A `language-not-supported` error from an
 on-device session switches that recognizer back to cloud. Upstream's onerror
 returns early for routine errors. Each mic start is logged (`mic start`,

@@ -14,3 +14,7 @@ test('network, aborted, no-speech are never shown to Mark', () => {
 test('dist/stts_ui.html (what the daemon serves) matches src', () => {
   assert.equal(readFileSync(new URL('../dist/stts_ui.html', import.meta.url), 'utf8'), html);
 });
+test('install() runs from the first user gesture, with a hint', () => {
+  assert.match(html, /Click anywhere to enable local speech/);
+  assert.match(html, /\['pointerdown', 'keydown'\]\.forEach\(t => addEventListener\(t, go, true\)\)/);
+});
