@@ -53,6 +53,11 @@ node --test test/*.test.mjs
 rounds: set, kept across a request without them, clamped, junk ignored, and no
 local storage in the block.
 
+The slider thumb moves to the live rate too, so the slider always shows the
+rate actually used (Mark 2026-10-01: the thumb sat at 1.3 while speech played
+at an agent's rate 1). Checked in a real Chrome tab: `activateTts` with `rate: 1`
+spoke at 1 with the label `1.0x (this window)` and the thumb at 1.3 before the fix.
+
 Not tested live: call `tts` with `rate: 1.8`; the label reads `1.8x (this
 window)` and the next window is back to the saved rate.
 

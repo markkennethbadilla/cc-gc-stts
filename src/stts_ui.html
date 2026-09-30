@@ -1979,7 +1979,8 @@
       }
       const origActivateTts = activateTts;
       activateTts = function (config) {
-        if (applyLive(config).rate !== null) rateVal.textContent = live.rate.toFixed(1) + 'x (this window)';
+        // The thumb moves too, so the slider always shows the rate actually used.
+        if (applyLive(config).rate !== null) { rateRange.value = live.rate; rateVal.textContent = live.rate.toFixed(1) + 'x (this window)'; }
         const r = withSuppressed(origActivateTts)(config);
         if (!isRecording) { try { origToggle(); } catch { } }
         return r;
