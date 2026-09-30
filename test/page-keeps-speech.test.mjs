@@ -85,9 +85,18 @@ test('the daemon side and the page side agree on the message names', () => {
   assert.match(daemon, /type: 'released'/);
   assert.match(src[0], /sendSocket\(\{ type: 'stopped' \}\)/);
   assert.match(daemon, /case 'stopped':/);
-  // Spec 016: talking over it hands his words to the agent, then stops the voice at once.
-  assert.match(html, /if \(heard\) \{ idleInterim = ''; sendSocket\(\{ type: 'heard', text: heard \}\); stopSpeaking\(\); gotitBtn\.disabled = true; resetToIdle\(\); return; \}/);
-  assert.match(daemon, /case 'heard':/);
+});
+
+// Spec 016 (2026-09-30). Talking over the voice does not stop it: while the agent
+// speaks, every final that is not its own voice, short or long, goes to carry for
+// the next prompt, and nothing in that branch stops the voice or ends the tts.
+test('talking over the voice keeps his words and lets the voice finish', () => {
+  const branch = html.match(/ {8}if \(currentMode === 'tts'\) \{[\s\S]*?\n {10}return;\n {8}\}/);
+  assert.ok(branch, 'tts branch of onresult not found');
+  for (const banned of ['stopSpeaking', 'synth.cancel', 'resetToIdle', "'heard'", 'isEcho']) assert.ok(!branch[0].includes(banned), banned);
+  assert.match(branch[0], /const kept = stripCommands\(dedupe\(finalText\)\);\s*if \(kept\) carry = \[carry, kept\]/);
+  const daemon = readFileSync(new URL('../src/stts-daemon.ts', import.meta.url), 'utf8');
+  assert.ok(!/case 'heard'/.test(daemon), 'daemon still has the talk-over stop path');
 });
 
 test('sending or cancelling a prompt never switches the mic off (live CDP finding 2026-09-28)', () => {

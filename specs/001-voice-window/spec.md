@@ -47,7 +47,7 @@ being lost.
   Successive finals get a space between them.
 - **Barge-in with echo filter.** Off by default (speakers): the mic is
   muted while the agent talks. On (headset): talking over the agent
-  stops it and what Mark said becomes the next prompt. The page
+  does not stop it (spec 016); what Mark said becomes the next prompt. The page
   compares what it hears with what it is saying so the agent's own
   voice is not taken as Mark.
 - **Settings gear.** Voice, speaking rate 0.5x to 2x, auto-send and

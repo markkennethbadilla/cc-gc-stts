@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { launchStt, launchTts, REQUEST_TIMEOUT_MS } from './daemon-client.ts';
-import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED, HEARD } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED } from './protocol.ts';
 import { loadText, toParts } from './read-aloud.ts';
 
 const ENDED_NOTE =
@@ -124,7 +124,6 @@ server.registerTool(
 
     let i = first;
     let stopped = false;
-    let over: string | null = null;
     for (; i < parts.length; i++) {
       if (i > first && Date.now() - t0 > READ_BUDGET_MS) break;
       const last = i === parts.length - 1;
@@ -137,20 +136,10 @@ server.registerTool(
         timeoutMs: left(),
       });
       if (r === STOPPED) { stopped = true; break; }
-      if (r.startsWith(HEARD)) { over = r.slice(HEARD.length).trim(); break; }
     }
 
     const n = parts.length;
     const where = file ? 'the same file' : url ? 'the same url' : 'the same text';
-    // Spec 016. His words over the agent's voice come back at once; the agent decides.
-    if (over !== null) {
-      const goOn = n > 1 ? `call tts with ${where} and part=${i + 1}` : 'say it again, or the rest of it, with tts';
-      return reply(
-        `He spoke while you were speaking: "${over}". Your voice stopped${n > 1 ? ` during part ${i + 1} of ${n}` : ''}. ` +
-          `If it was meant for you, answer it with tts (listen=true). ` +
-          `If it was not (a TV, someone else in the room), ${goOn}.`
-      );
-    }
     let note = '';
     if (stopped) {
       note = n > 1 ? `He stopped it during part ${i + 1} of ${n}. To resume there, call tts with ${where} and part=${i + 1}.` : 'He stopped it.';

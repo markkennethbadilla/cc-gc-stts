@@ -76,20 +76,3 @@ test('a long reply with no overlap is kept', () => {
   spokenText = agentLine; endedAgo = 1000;
   assert.equal(check('lets build the onboarding machine for small agencies tonight instead'), false);
 });
-
-// Spec 016. Talking over the voice stops it only when isEcho lets the words through:
-// two or more content words that are not the agent's own text. Backchannels do not.
-const echoSrc = [grab(/const STOP = new Set\([^;]+;/, 'STOP'), grab(/const norm = \(s\) =>[^;]+;/, 'norm'),
-  grab(/const content = \(s\) =>[^;]+;/, 'content'), grab(/function ownVoice\(text\) \{[\s\S]*?\n {6}\}/, 'ownVoice'), grab(/function isEcho\(text\) \{[\s\S]*?\n {6}\}/, 'isEcho')].join('\n');
-const talkOverStops = (text) => !new Function('synth', 'ttsTextarea', 'speakEndedAt', 'Date', 'bargeIn', `${echoSrc}\nreturn isEcho;`)(
-  { speaking: true }, { value: agentLine }, 0, { now: () => 0 }, { checked: true })(text);
-
-test('talk-over: real words stop the voice, its own echo and backchannels do not', () => {
-  for (let round = 0; round < 3; round++) {
-    assert.equal(talkOverStops('hang on a second'), true);
-    assert.equal(talkOverStops('wait what about pricing'), true);
-    for (const no of ['yeah', 'mm-hmm', 'yeah okay right', 'stop', 'rulesync and gitleaks', 'every dependency is permissive']) {
-      assert.equal(talkOverStops(no), false, no);
-    }
-  }
-});

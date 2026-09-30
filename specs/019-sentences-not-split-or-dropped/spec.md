@@ -55,8 +55,7 @@ Three causes, all in the page:
   voice: heard while it speaks or within 1.5 s after, and nearly all words from
   the text it is saying (with speakers, everything heard while it speaks, as
   before, since the microphone is paused then anyway). That is dropped.
-  `isEcho(text)` still decides whether talking over it stops the voice: not its
-  own voice and two or more content words (spec 016). Everything else heard in
+  Talking over it never stops the voice (spec 016). Everything else heard in
   the agent's turn goes into `carry` (finals) or the held interim (unfinished
   text, spec 012), so it starts his next prompt or, if the agent goes idle
   instead of listening, reaches it as a barge-in after his pause.

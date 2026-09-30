@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
-import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED, HEARD } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED } from './protocol.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -399,15 +399,6 @@ wss.on('connection', (socket) => {
         // Spec 013. He stopped the speaking turn; a reading must not go on to its next part.
         if (pending?.config.mode === 'tts') resolvePending(STOPPED);
         return;
-      case 'heard': {
-        // Spec 016. Words over the agent's voice: a pending tts returns them at once;
-        // otherwise they are kept like any speech between tool calls.
-        const heard = typeof msg.text === 'string' ? msg.text.trim() : '';
-        if (!heard) return;
-        if (pending?.config.mode === 'tts') resolvePending(`${HEARD} ${heard}`);
-        else barge.push(heard);
-        return;
-      }
       case 'ended':
         // Spec 008. End conversation, said in a word the agent cannot mistake
         // for speech and does not have to infer from an empty string.
