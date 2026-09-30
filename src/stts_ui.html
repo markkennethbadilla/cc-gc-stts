@@ -1553,20 +1553,20 @@
         const legacy = localStorage.getItem(LS_BARGE_IN);
         if (legacy !== null) localStorage.setItem(LS_HEADPHONE_MODE, legacy);
       }
-      /* Spec 019. Auto-send after 0.1 s of quiet (Mark 2026-09-30), or after the longer hold
+      /* Spec 019. Auto-send after 0.7 s of quiet (Mark 2026-09-30), or after the longer hold
          when what he said so far reads unfinished (readsUnfinished below); the agent still judges
          whether the thought is finished and listens again to join the pieces. A saved 3.5 s, 2 s,
-         1 s or 0.7 s (earlier defaults, never a choice) moves to 0.1 s once, and a saved 2.2 s hold moves to 1 s. A value Mark sets later is left
+         1 s, 0.3 s or 0.1 s (earlier defaults) moves to 0.7 s once, and a saved 2.2 s hold moves to 1 s. A value Mark sets later is left
          alone: the marker makes this run one time. */
-      const PAUSE_DEFAULT_MS = 100;
+      const PAUSE_DEFAULT_MS = 700;
       const HOLD_DEFAULT_MS = 1000;
       const LS_HOLD_MS = '__stts__hold_ms';
       function migratePause(ls) {
-        if (ls.getItem('__stts__autosend_ms_v5') !== null) return;
+        if (ls.getItem('__stts__autosend_ms_v6') !== null) return;
         const saved = ls.getItem(LS_AUTOSEND_MS);
-        if (['3500', '2000', '1000', '700'].includes(saved)) ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
+        if (['3500', '2000', '1000', '300', '100'].includes(saved)) ls.setItem(LS_AUTOSEND_MS, String(PAUSE_DEFAULT_MS));
         if (ls.getItem('__stts__hold_ms') === '2200') ls.setItem('__stts__hold_ms', '1000');
-        ls.setItem('__stts__autosend_ms_v5', '1');
+        ls.setItem('__stts__autosend_ms_v6', '1');
       }
       /* Spec 019 (Mark 2026-09-30): "never cut me off." The same list as protocol.ts and the call
          bot's turn.mjs (rule 67). */

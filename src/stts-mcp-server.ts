@@ -57,7 +57,7 @@ const NO_SLEEP_NOTE =
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
   'Use the default idleSec for every normal wait: a background result arrives on its own and interrupts the listen. ' +
   'The one exception (spec 023): a listen made only because a turn reads unfinished passes idleSec 1.';
-// Spec 019: a turn is sent after 0.1 s of quiet (1 s when it trails off), and the agent
+// Spec 019: a turn is sent after 0.7 s of quiet (1 s when it trails off), and the agent
 // judges whether the thought is finished; when unsure, it listens again rather than answer.
 const midThought = (again: string) =>
   ' A turn can arrive mid-thought. If the transcript reads unfinished (trails off, ends on a connector ' +

@@ -15,17 +15,17 @@ const store = (init) => {
 };
 const migrate = (ls) => new Function('LS_AUTOSEND_MS', `${migrateSrc}\nmigratePause(arguments[1]); return PAUSE_DEFAULT_MS;`)('__stts__autosend_ms', ls);
 
-test('default pause is 0.1 s and the page falls back to it (spec 019)', () => {
-  assert.equal(migrate(store({})), 100);
+test('default pause is 0.7 s and the page falls back to it (spec 019)', () => {
+  assert.equal(migrate(store({})), 700);
   assert.match(html, /const pauseMs = \(\) => Number\(localStorage\.getItem\(LS_AUTOSEND_MS\)\) \|\| PAUSE_DEFAULT_MS;/);
 });
 
-test('a saved old default of 3.5 s, 2 s, 1 s or 0.7 s moves to 0.1 s once; any other value, and later choices, stay', () => {
+test('a saved old default of 3.5 s, 2 s, 1 s, 0.3 s or 0.1 s moves to 0.7 s once; any other value, and later choices, stay', () => {
   for (let round = 0; round < 3; round++) {
-    for (const oldDefault of ['3500', '2000', '1000', '700']) {
-      const old = store({ __stts__autosend_ms: oldDefault, __stts__autosend_ms_v4: '1' });   // v4 already ran
+    for (const oldDefault of ['3500', '2000', '1000', '300', '100']) {
+      const old = store({ __stts__autosend_ms: oldDefault, __stts__autosend_ms_v5: '1' });   // v5 already ran
       migrate(old);
-      assert.equal(old.getItem('__stts__autosend_ms'), '100');
+      assert.equal(old.getItem('__stts__autosend_ms'), '700');
       old.setItem('__stts__autosend_ms', oldDefault);   // Mark picks it again on purpose
       migrate(old);
       assert.equal(old.getItem('__stts__autosend_ms'), oldDefault);
@@ -33,7 +33,7 @@ test('a saved old default of 3.5 s, 2 s, 1 s or 0.7 s moves to 0.1 s once; any o
       migrate(h);
       assert.equal(h.getItem('__stts__hold_ms'), '1000');
     }
-    for (const v of ['1500', '2500', '4000', '300', '100']) {
+    for (const v of ['1500', '2500', '4000', '500', '700']) {
       const s = store({ __stts__autosend_ms: v });
       migrate(s);
       assert.equal(s.getItem('__stts__autosend_ms'), v);
