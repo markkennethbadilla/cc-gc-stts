@@ -91,7 +91,7 @@ test('the daemon side and the page side agree on the message names', () => {
 // speaks, every final that is not its own voice, short or long, goes to carry for
 // the next prompt, and nothing in that branch stops the voice or ends the tts.
 test('talking over the voice keeps his words and lets the voice finish', () => {
-  const branch = html.match(/ {8}if \(currentMode === 'tts'\) \{[\s\S]*?\n {10}return;\n {8}\}/);
+  const branch = html.match(/ {8}if \(currentMode === 'tts'\) \{[\s\S]*?\r?\n {10}return;\r?\n {8}\}/);
   assert.ok(branch, 'tts branch of onresult not found');
   for (const banned of ['stopSpeaking', 'synth.cancel', 'resetToIdle', "'heard'", 'isEcho']) assert.ok(!branch[0].includes(banned), banned);
   assert.match(branch[0], /const kept = stripCommands\(dedupe\(finalText\)\);\s*if \(kept\) carry = \[carry, kept\]/);

@@ -25,3 +25,18 @@ export const LISTEN_CONTINUES = '__STTS_LISTEN_CONTINUES__';
 
 // Spec 013, 016. He pressed the stop button. A reading stops here instead of going on.
 export const STOPPED = '__STTS_STOPPED__';
+
+// Spec 019 (Mark 2026-09-30): "never cut me off." Speech whose last word is a
+// connector, a filler, a preposition, an article, or a lead-in ("so I was
+// thinking") reads unfinished. The same list is in stts_ui.html and in the
+// call bot's turn.mjs (rule 67). ponytail: fixed word list; add a word when a
+// live cut-off shows one.
+export const UNFINISHED_END = new Set(
+  ('and or but so because cause like um uh er erm hmm the a an to of with for from in on at by into about ' +
+    'if that which who whose when while where what how as than then also just maybe my your our their his her its ' +
+    "is are was were be i we you he she they it's i'm thinking wondering saying guess mean know said").split(' ')
+);
+export function readsUnfinished(text: string): boolean {
+  const words = String(text).toLowerCase().replace(/[^a-z' ]+/g, ' ').trim().split(/\s+/);
+  return UNFINISHED_END.has(words[words.length - 1]);
+}

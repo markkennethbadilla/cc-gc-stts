@@ -15,22 +15,22 @@ const store = (init) => {
 };
 const migrate = (ls) => new Function('LS_AUTOSEND_MS', `${migrateSrc}\nmigratePause(arguments[1]); return PAUSE_DEFAULT_MS;`)('__stts__autosend_ms', ls);
 
-test('default pause is 1 s and the page falls back to it', () => {
-  assert.equal(migrate(store({})), 1000);
+test('default pause is 0.7 s and the page falls back to it (spec 019)', () => {
+  assert.equal(migrate(store({})), 700);
   assert.match(html, /const pauseMs = \(\) => Number\(localStorage\.getItem\(LS_AUTOSEND_MS\)\) \|\| PAUSE_DEFAULT_MS;/);
 });
 
-test('a saved old default of 3.5 s or 2 s moves to 1 s once; any other value, and later choices, stay', () => {
+test('a saved old default of 3.5 s, 2 s or 1 s moves to 0.7 s once; any other value, and later choices, stay', () => {
   for (let round = 0; round < 3; round++) {
-    for (const oldDefault of ['3500', '2000']) {
-      const old = store({ __stts__autosend_ms: oldDefault, __stts__autosend_ms_v2: '1' });   // v2 already ran
+    for (const oldDefault of ['3500', '2000', '1000']) {
+      const old = store({ __stts__autosend_ms: oldDefault, __stts__autosend_ms_v3: '1' });   // v3 already ran
       migrate(old);
-      assert.equal(old.getItem('__stts__autosend_ms'), '1000');
+      assert.equal(old.getItem('__stts__autosend_ms'), '700');
       old.setItem('__stts__autosend_ms', oldDefault);   // Mark picks it again on purpose
       migrate(old);
       assert.equal(old.getItem('__stts__autosend_ms'), oldDefault);
     }
-    for (const v of ['1500', '2500', '4000', '300', '1000']) {
+    for (const v of ['1500', '2500', '4000', '300', '700']) {
       const s = store({ __stts__autosend_ms: v });
       migrate(s);
       assert.equal(s.getItem('__stts__autosend_ms'), v);
@@ -39,6 +39,29 @@ test('a saved old default of 3.5 s or 2 s moves to 1 s once; any other value, an
     migrate(fresh);
     assert.equal(fresh.getItem('__stts__autosend_ms'), null);   // unset: the default applies
   }
+});
+
+// Spec 019. Speech that trails off waits the longer hold before it is sent; a finished
+// sentence keeps the short pause. The page and the MCP server use the same word list.
+test('an unfinished ending waits the hold; a finished one the pause; page and server agree', async () => {
+  const page = new Function(`${grab(/const UNFINISHED_END = new Set\([\s\S]*?\.split\(' '\)\);/, 'UNFINISHED_END')}\n${grab(/function readsUnfinished\(text\) \{[\s\S]*?\n {6}\}/, 'readsUnfinished')}\nreturn readsUnfinished;`)();
+  const { readsUnfinished: server } = await import('../src/protocol.ts');
+  const quietSrc = grab(/const quietMs = \(text\) => [^\n]*/, 'quietMs');
+  const quietMs = new Function('readsUnfinished', 'holdMs', 'pauseMs', `${quietSrc}\nreturn quietMs;`)(page, () => 2200, () => 700);
+  for (let round = 0; round < 3; round++) {
+    for (const t of ['and', 'so i was thinking', 'because the', 'we could um', 'I went to the']) {
+      assert.equal(page(t), true, t);
+      assert.equal(server(t), true, t);
+      assert.equal(quietMs(t), 2200, t);
+    }
+    for (const t of ['what do you think about the budget', 'okay thanks', 'run the tests', '', 'Done.']) {
+      assert.equal(page(t), false, t);
+      assert.equal(server(t), false, t);
+      assert.equal(quietMs(t), 700, t);
+    }
+  }
+  assert.match(html, /pauseTimer = setTimeout\(flushAndSend, quietMs\(/);
+  assert.match(html, /\}, quietMs\(carry\)\);/);
 });
 
 test('a recognizer that ends restarts at once; only rapid repeat failures back off, capped at 2 s', () => {
