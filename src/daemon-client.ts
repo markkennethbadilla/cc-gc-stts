@@ -177,10 +177,6 @@ export function postRequest(
         res.on('data', (c: Buffer) => chunks.push(c));
         res.on('end', () => {
           const raw = Buffer.concat(chunks).toString('utf-8');
-          if (res.statusCode === 409) {
-            reject(new Error('stts daemon is busy with another request'));
-            return;
-          }
           if (res.statusCode !== 200) {
             reject(new Error(`stts daemon returned ${res.statusCode}: ${raw}`));
             return;

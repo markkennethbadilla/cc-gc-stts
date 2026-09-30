@@ -272,10 +272,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/request') {
+    // Spec 024. The newest request takes over. An interrupted tool call (Esc,
+    // a cancelled turn, a gateway that never forwards the cancel) leaves its
+    // request held here, and every later call was refused `409 busy` until the
+    // daemon was restarted by hand (2026-09-30). One window serves one
+    // conversation, so a new call means the old caller is gone: its request is
+    // answered as superseded and the new one proceeds. A superseded listen tells
+    // the page to keep what it heard, as at the time limit, so no speech is lost.
     if (pending) {
-      res.writeHead(409, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'busy' }));
-      return;
+      const old = pending;
+      pending = null;
+      clearPendingTimer();
+      if (old.config.mode === 'stt' && pageSocket?.readyState === WebSocket.OPEN) {
+        pageSocket.send(JSON.stringify({ type: 'released' }));
+      }
+      old.cancel('superseded by a newer stts request');
     }
     let config: RequestConfig;
     try {
