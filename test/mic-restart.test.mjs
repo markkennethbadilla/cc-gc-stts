@@ -56,7 +56,7 @@ test('never while the agent has the turn (tts), while paused by Space, while the
 test('the watchdog clears a stale speech pause and logs every restart', () => {
   const wd = html.match(/setInterval\(\(\) => \{\s*if \(!mic\) return;[\s\S]*?\}, 2000\);/);
   assert.ok(wd, 'spec 011 watchdog not found');
-  assert.match(wd[0], /mic\.__paused = false/);
+  assert.match(wd[0], /mic\.__paused = muted/);
   assert.match(wd[0], /micLog\(`mic restart/);
   assert.match(wd[0], /mic\.start\(\)/);
 });

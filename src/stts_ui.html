@@ -1876,6 +1876,8 @@
           });
         }
         this.__wanted = true; this.__fatal = false;
+        // Spec 030: mute is Mark's. A listen wants the mic, but while muted it stays off.
+        if (this === mic && muted) { this.__paused = true; return; }
         return origStart.call(this);
       };
       SR.prototype.stop = function () { this.__wanted = false; return origStop.call(this); };
@@ -1932,7 +1934,7 @@
         micLog(`mic restart #${++restarts}: ${why}`);
         saveIdleInterim();
         heardAt = endedAt = Date.now(); speechStartedAt = 0;
-        mic.__paused = false; mic.__fatal = false;   // a pause left by a lost speech 'end' is stale in a listen
+        mic.__paused = muted; mic.__fatal = false;   // a pause left by a lost speech 'end' is stale in a listen
         try { origAbort.call(mic); } catch { }
         // The 'end' hook usually restarts it first; this start covers an abort that fires no 'end'.
         // A start that finds it already running throws, which is fine.
