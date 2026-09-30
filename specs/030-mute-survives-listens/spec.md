@@ -29,7 +29,7 @@ Only in-memory page state: `muted`, and the recognizer's `__wanted` and
 
 `node --test test/*.test.mjs` runs `test/mute-survives-listens.test.mjs`: pause, five
 listens in a row stay silent, unpause starts the microphone, repeated three
-times, plus 1000 paused listens. Rebuild with `npm run build`. The running
+times, plus 1000 paused listens. Live: `node build.mjs && node test/mute-persists.live.mjs` opens a real window on its own port, pauses, runs 5 listens and resumes. Rebuild with `npm run build`. The running
 window picks the fix up when the page reloads (close and reopen the stts
 window); the daemon does not need a restart.
 
