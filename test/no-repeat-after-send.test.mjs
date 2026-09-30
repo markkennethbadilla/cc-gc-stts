@@ -21,7 +21,7 @@ function page() {
   const fns = {
     isSpokenBack: () => false, ownVoice: () => false, clearInterim: () => { s.prov = null; }, keepCaret: () => {},
     armPause: () => {}, armBarge: () => {}, stripCommands: (t) => t, mic: {}, insert,
-    bargeIn: { checked: false }, synth: { speaking: false }, echoIdx: -1, stripEcho: (t) => t,   // spec 032
+    bargeIn: { checked: false }, synth: { speaking: false }, echoIdx: -1, stripEcho: (t) => t, stripTail: (t) => t,   // spec 032, 036
     showInterim: () => {},   // interim stays pending, sent by flushInterim (the auto-send path)
     upstreamOnResult: { call: (_, e) => insert(e.results[0][0].transcript.trim()) },
   };

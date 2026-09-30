@@ -21,7 +21,7 @@ function page() {
   const insert = (t) => { if (t) s.input.value += (s.input.value ? ' ' : '') + t; };
   const synth = { speaking: true };
   const fns = {
-    isSpokenBack: () => false, ownVoice: () => false, clearInterim: () => {}, keepCaret: () => {},
+    isSpokenBack: () => false, stripTail: (t) => t, ownVoice: () => false, clearInterim: () => {}, keepCaret: () => {},
     armPause: () => {}, armBarge: () => {}, stripCommands: (t) => t, mic: {}, insert, showInterim: () => {},
     bargeIn: { checked: false }, synth, ttsTextarea: { value: SAID },
     upstreamOnResult: { call: (_, e) => insert(e.results[0][0].transcript.trim()) },
