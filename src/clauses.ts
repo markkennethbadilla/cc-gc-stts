@@ -1,4 +1,4 @@
-// Spec 034. A copy of weassist-callbot server.mjs clauses()/segment() (callbot spec 006):
+// Spec 038 (was 034). A copy of weassist-callbot server.mjs clauses()/segment() (callbot spec 006):
 // the two repos have different owners, so the text is copied, not shared. Change both (rule 67).
 export function clauses(text: unknown): string[] {
   const t = String(text);

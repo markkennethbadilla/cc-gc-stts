@@ -23,7 +23,6 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chrome-launcher": "^1.2.1",
     "commander": "^14.0.3",
-    "edge-tts-universal": "1.4.0",
     "remove-markdown": "0.7.0",
     "ws": "^8.18.0"
   }

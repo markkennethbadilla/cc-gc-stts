@@ -1300,21 +1300,12 @@
 
       // Spec 022. One utterance per sentence (Intl.Segmenter, as toParts on the server), never per
       // comma: every utterance boundary is an audible gap in the browser's speechSynthesis.
-      // Spec 031: in Chrome the best default is Google US English (a network voice, far
-      // more natural than the local SAPI David/Zira); offline it is absent and the
-      // first local en-US voice is used instead. A voice picked in the bar wins.
-      const picked = voices.find((v) => v.name === localStorage.getItem('__stts__voice'));
-      const voice = picked ||
-        voices.find((v) => v.name === 'Google US English') ||
-        voices.find((v) => v.lang === 'en-US') ||
-        voices.find((v) => v.lang.startsWith('en-US')) ||
-        voices.find((v) => v.lang.startsWith('en')) ||
-        voices[0];
+      // Spec 038: no network voice (Google US English is gone); a picked voice that is not a
+      // Windows voice is a Piper name, handled by the shim below.
+      const voice = voices.find((v) => v.name === localStorage.getItem('__stts__voice') && v.localService) || null;
 
-      // Spec 033: a system voice (localService, e.g. the Microsoft Online voices through
-      // NaturalVoiceSAPIAdapter) gets the whole part as one utterance, because each
-      // utterance is a new request to the voice service and every boundary is a long gap.
-      // Chrome's own network voices (Google US English) still get one per sentence.
+      // Spec 033: a picked Windows voice speaks the whole part as one utterance (every
+      // utterance boundary is a gap). Otherwise one per sentence; the Piper shim cuts further.
       const sentences = voice && voice.localService ? [textToSpeak.trim()].filter(Boolean)
         : [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(textToSpeak)]
           .map((s) => s.segment.trim()).filter(Boolean);
@@ -1584,60 +1575,74 @@
       }
       migratePause(localStorage);
 
-      /* ---- spec 034: Microsoft online voices, the call bot's way ----
+      /* ---- spec 038: Piper voices, synthesized on this PC ----
          speechSynthesis.speak/cancel/speaking/pending are replaced, so upstream and the rest of
          this block (rate, barge-in) keep working unchanged.
-         Each utterance is cut at every punctuation mark by the daemon (/edge/split, the call
-         bot's clauses()), up to three clips render ahead while one plays (/edge/clip,
-         edge-tts-universal), and each clip plays without Edge's leading and trailing silence.
-         A clip that fails to render is spoken by the browser's own voice instead. */
-      const EDGE_DEFAULT = 'en-US-AvaMultilingualNeural';
+         Each utterance is cut at every punctuation mark by the daemon (/voice/split, the call
+         bot's clauses()), up to three clips render ahead while one plays (/voice/clip, Piper's
+         own HTTP server run by the daemon). A clip that fails is spoken by a local Windows voice
+         instead, and the status line says so. Nothing spoken goes over the network. */
+      const PIPER_DEFAULT = 'en_US-lessac-medium';
       const RENDER_AHEAD = 3;
       const SS = SpeechSynthesis.prototype;
       const nativeSpeak = SS.speak, nativeCancel = SS.cancel;
       const nativeSpeaking = Object.getOwnPropertyDescriptor(SS, 'speaking').get;
-      let edgeVoices = [];
-      fetch('/edge/voices').then(r => (r.ok ? r.json() : [])).then(v => {
-        edgeVoices = v;
-        // A voice saved by its SAPI-adapter name ("Microsoft Ava Online (Natural) - ...") moves to Edge's.
-        const s = localStorage.getItem(LS_VOICE), hit = s && v.find(x => x.friendly === s);
-        if (hit) localStorage.setItem(LS_VOICE, hit.name);
-        window.dispatchEvent(new Event('edgevoices'));
+      let piperVoices = [];
+      fetch('/voice/voices').then(r => (r.ok ? r.json() : [])).then(v => {
+        piperVoices = v;
+        window.dispatchEvent(new Event('pipervoices'));
       }).catch(() => { });
-      function edgeVoiceFor() {
-        const s = localStorage.getItem(LS_VOICE);
-        if (!s) return EDGE_DEFAULT;
-        const v = edgeVoices.find(x => x.name === s || x.friendly === s);
-        return v ? v.name : /Neural$/.test(s) ? s : null;   // a browser voice was picked
+      // Fallback and picker: local (localService) Windows voices only, a natural one first.
+      function localVoice(voices) {
+        const local = voices.filter((v) => v.localService), en = (v) => v.lang.startsWith('en');
+        return local.find((v) => v.name === localStorage.getItem(LS_VOICE)) ||
+          local.find((v) => en(v) && /natural/i.test(v.name)) ||
+          local.find((v) => v.lang === 'en-US') || local.find(en) || local[0] || null;
       }
+      function piperVoiceFor() {
+        const s = localStorage.getItem(LS_VOICE);
+        if (s && piperVoices.some(x => x.name === s)) return s;
+        if (s && speechSynthesis.getVoices().some(x => x.name === s && x.localService)) return null;   // a Windows voice was picked
+        return piperVoices.some(x => x.name === PIPER_DEFAULT) ? PIPER_DEFAULT : piperVoices[0]?.name || null;
+      }
+      const ttsLog = (text) => { try { sendSocket({ type: 'log', text: 'tts ' + text }); } catch { } };
       const audio = new AudioContext();
+      audio.onstatechange = () => ttsLog('audio ' + audio.state);
+      // With --autoplay-policy this runs anyway; any press or key also wakes a suspended context.
+      ['pointerdown', 'keydown'].forEach(k => addEventListener(k, () => { if (audio.state !== 'running') audio.resume(); }, true));
       const clips = [];   // {item, text, last, p}
       let splits = 0, gen = 0, cur = null, running = false, src = null, splitChain = Promise.resolve();
       const fire = (u, type, extra) => u.dispatchEvent(Object.assign(new Event(type), extra));
       function render(c) {
         if (c.p) return;
-        const q = new URLSearchParams({ text: c.text, voice: c.item.voice, rate: c.item.rate, volume: c.item.volume });
-        c.p = fetch('/edge/clip?' + q).then(async r => {
+        const q = new URLSearchParams({ text: c.text, voice: c.item.voice, rate: c.item.rate });
+        // A stalled render or decode must never hang pump(): every later reply would be silent.
+        c.p = fetch('/voice/clip?' + q, { signal: AbortSignal.timeout(25000) }).then(async r => {
           if (!r.ok) throw new Error(await r.text());
           const from = Number(r.headers.get('X-Speech-From')) || 0, to = Number(r.headers.get('X-Speech-To')) || Infinity;
           return { buf: await audio.decodeAudioData(await r.arrayBuffer()), from, to };
         });
         c.p.catch(() => { });
       }
-      function playBuf({ buf, from, to }) {
+      function playBuf({ buf, from, to }, volume) {
         return new Promise(done => {
-          if (audio.state === 'suspended') audio.resume();
+          if (audio.state !== 'running') { ttsLog('audio ' + audio.state + ', resuming'); audio.resume(); }
           src = audio.createBufferSource();
-          src.buffer = buf; src.connect(audio.destination); src.onended = done;
-          const start = Math.min(from, buf.duration);
-          src.start(0, start, Math.max(0, Math.min(to, buf.duration) - start));
+          const gain = audio.createGain(); gain.gain.value = Number.isFinite(volume) ? volume : 1;
+          const start = Math.min(from, buf.duration), len = Math.max(0, Math.min(to, buf.duration) - start);
+          // Watchdog: onended never fires on a context that stays suspended; never wedge the queue.
+          const dog = setTimeout(() => { ttsLog('clip watchdog, audio ' + audio.state); done(); }, len * 1000 + 3000);
+          src.buffer = buf; src.connect(gain).connect(audio.destination);
+          src.onended = () => { clearTimeout(dog); done(); };
+          src.start(0, start, len);
         });
       }
       function playNative(c) {
         return new Promise(done => {
           const n = new SpeechSynthesisUtterance(c.text);
           n.rate = c.item.rate; n.volume = c.item.volume;
-          if (c.item.u.voice) n.voice = c.item.u.voice;
+          const lv = c.item.u.voice || localVoice(speechSynthesis.getVoices());
+          if (lv) n.voice = lv;
           n.onend = n.onerror = done;
           nativeSpeak.call(speechSynthesis, n);
         });
@@ -1651,12 +1656,15 @@
             clips.slice(0, RENDER_AHEAD + 1).forEach(render);
             const c = clips[0];
             let a = null;
-            try { a = await c.p; } catch (e) { console.warn('edge clip failed, browser voice instead:', e.message); }
+            try { a = await c.p; } catch (e) {
+              ttsLog('piper clip failed, Windows voice instead: ' + e.message);
+              ttsStatus.textContent = 'Piper voice failed, speaking with a Windows voice';
+            }
             if (mine !== gen) break;
             clips.shift();
             cur = c;
             fire(c.item.u, 'start');   // per clip
-            await (a ? playBuf(a) : playNative(c));
+            await (a ? playBuf(a, c.item.volume) : playNative(c));
             if (mine !== gen) break;
             cur = null;
             if (c.last) fire(c.item.u, 'end');
@@ -1669,11 +1677,12 @@
       Object.defineProperty(speechSynthesis, 'speaking', { get: () => !!cur || clips.length > 0 || splits > 0 || nativeSpeaking.call(speechSynthesis) });
       Object.defineProperty(speechSynthesis, 'pending', { get: () => clips.length > 0 || splits > 0 });
       SS.speak = function (u) {
-        const voice = u.text && edgeVoiceFor();
+        const voice = u.text && piperVoiceFor();
+        if (u.text) ttsLog(`speak ${u.text.length} chars voice=${voice || u.voice?.name || 'windows'}`);
         if (!voice) return nativeSpeak.call(this, u);
         const item = { u, voice, rate: u.rate, volume: u.volume, gen };
         splits++;
-        const parts = fetch('/edge/split', { method: 'POST', body: u.text }).then(r => r.json()).catch(() => [u.text]);
+        const parts = fetch('/voice/split', { method: 'POST', body: u.text }).then(r => r.json()).catch(() => [u.text]);
         splitChain = splitChain.then(() => parts).then(ps => {
           if (item.gen !== gen) return;   // cancelled: cancel already zeroed splits
           splits--;
@@ -1839,14 +1848,14 @@
         const voices = synth.getVoices();
         const saved = localStorage.getItem(LS_VOICE) || '';
         const opt = (v) => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`;
-        // Spec 034: the Microsoft online voices (all English locales) first; browser voices are the offline fallback.
-        voiceSelect.innerHTML = `<option value="">Default (${EDGE_DEFAULT})</option>` +
-          (edgeVoices.length ? '<optgroup label="Microsoft online">' + edgeVoices.map(opt).join('') + '</optgroup>' : '') +
-          '<optgroup label="Browser (offline)">' + voices.map(opt).join('') + '</optgroup>';
+        // Spec 038: installed Piper voices first; local Windows voices are the fallback. No online voices.
+        voiceSelect.innerHTML = `<option value="">Default (${PIPER_DEFAULT})</option>` +
+          (piperVoices.length ? '<optgroup label="Piper (this PC)">' + piperVoices.map(opt).join('') + '</optgroup>' : '') +
+          '<optgroup label="Windows (this PC)">' + voices.filter(v => v.localService).map(opt).join('') + '</optgroup>';
       }
       fillVoices();
       synth.addEventListener('voiceschanged', fillVoices);
-      window.addEventListener('edgevoices', fillVoices);
+      window.addEventListener('pipervoices', fillVoices);
       voiceSelect.onchange = () => localStorage.setItem(LS_VOICE, voiceSelect.value);
 
       /* ---- speaking rate, 0.5x to 2x ---- */
@@ -1978,8 +1987,8 @@
       }).catch(() => { });
       /* Spec 037. The recognizer listens to an echo-cancelled mic track (Chrome 135+ start(track)),
          so the browser's own acoustic echo canceller removes the agent's voice before recognition.
-         Chrome-wide AEC cancels everything Chrome plays, which covers the Microsoft online voices
-         (played through WebAudio); a Windows system voice plays outside Chrome and is not covered.
+         Chrome-wide AEC cancels everything Chrome plays, which covers the Piper clips
+         (played through WebAudio, spec 038); a Windows system voice plays outside Chrome and is not covered.
          Until the track is ready, or if it fails, the recognizer opens the default mic. */
       let aecTrack = null;
       function freshTrack() {

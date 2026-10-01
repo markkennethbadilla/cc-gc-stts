@@ -41,4 +41,4 @@ node --test test/*.test.mjs
 
 `test/one-utterance.test.mjs` checks the page (source and build) picks the
 saved voice and speaks a `localService` voice as one utterance. Live: pick a
-Microsoft Online voice, speak a three-sentence reply, listen for no long gap.
+Windows voice, speak a three-sentence reply, listen for no long gap.

@@ -26,10 +26,10 @@ becomes ready, a session already running on the default mic is aborted so it
 restarts on the track (a running session never switches source; seen live
 2026-10-01). The track settings are logged.
 
-Chrome-wide echo cancellation removes everything Chrome plays. The Microsoft
-online voices (the default, spec 034) play through WebAudio in Chrome, so they
-are cancelled. A Windows system voice picked in settings, or the fallback when
-an online clip fails, plays outside Chrome and is not cancelled.
+Chrome-wide echo cancellation removes everything Chrome plays. Piper clips
+(the default, spec 038) play through WebAudio in Chrome, so they are
+cancelled. A Windows system voice picked in settings, or the fallback when a
+Piper clip fails, plays outside Chrome and is not cancelled.
 
 Evaluated and not adopted:
 

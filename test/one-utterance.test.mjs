@@ -1,4 +1,4 @@
-// Spec 022/033. Upstream utterances per sentence (now each cut into clips by the spec 034 shim); guidance per spec 034.
+// Spec 022/033. Upstream utterances per sentence (each cut into clips by the spec 038 Piper shim).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -7,7 +7,7 @@ const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const sentences = (t) => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(t)]
   .map((s) => s.segment.trim()).filter(Boolean);
 
-test('sentence cuts only, one utterance per sentence, guidance asks for many marks (spec 034)', () => {
+test('sentence cuts only, one utterance per sentence, guidance asks for many marks (spec 038)', () => {
   for (let round = 0; round < 3; round++) {
     for (const f of ['src/stts_ui.html', 'dist/stts_ui.html']) {
       const html = read(f);
