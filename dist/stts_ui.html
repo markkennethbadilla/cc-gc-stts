@@ -1832,7 +1832,7 @@
       const settingsBtn = document.createElement('button');
       settingsBtn.id = 'settings-btn';
       settingsBtn.tabIndex = -1;
-      settingsBtn.title = 'Settings: voice, rate, auto-send, silence';
+      settingsBtn.title = 'Settings: voice, rate, mic, auto-send, silence';
       settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span>Settings</span>';
       settingsPop.popover = 'auto';
       settingsBtn.popoverTargetElement = settingsPop;
@@ -1945,6 +1945,20 @@
       /* Spec 003: bring-to-front on every request stole focus from whatever Mark was typing.
          Off by default; the daemon reads it over the socket on connect and on change. */
       const raiseBox = checkbox(ttsContainer, 'Window', 'raise-on-request', 'raise the window on every request', LS_RAISE, false).box;
+      /* Spec 039. Microphone picker: "System default" or one input device, saved by deviceId. */
+      const LS_MIC = '__stts__mic';
+      const micBar = addBar(sttContainer, 'Mic', '<select class="history-select" id="mic-select" title="Microphone used for listening"></select>');
+      const micSelect = micBar.querySelector('#mic-select');
+      function fillMics() {
+        const saved = localStorage.getItem(LS_MIC) || '';
+        navigator.mediaDevices.enumerateDevices().then(ds => {
+          micSelect.innerHTML = '<option value="">System default</option>' + ds.filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications')
+            .map(d => `<option value="${d.deviceId}"${d.deviceId === saved ? ' selected' : ''}>${d.label.replace(/</g, '&lt;') || 'Microphone'}</option>`).join('');
+        }).catch(() => { });
+      }
+      fillMics();
+      navigator.mediaDevices.addEventListener('devicechange', fillMics);
+      micSelect.onchange = () => { localStorage.setItem(LS_MIC, micSelect.value); freshTrack(); };
       const sendSettings = () => sendSocket({ type: 'settings', raise: raiseBox.checked });
       raiseBox.addEventListener('change', sendSettings);
       const origSendSocket = sendSocket;
@@ -2016,9 +2030,11 @@
          Until the track is ready, or if it fails, the recognizer opens the default mic. */
       let aecTrack = null;
       function freshTrack() {
-        navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+        const id = localStorage.getItem(LS_MIC);   // spec 039; 'ideal' falls back to the default if the device is gone
+        navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, ...(id ? { deviceId: { ideal: id } } : {}) } })
           .then(s => {
-            aecTrack = s.getAudioTracks()[0]; aecTrack.onended = freshTrack;
+            if (aecTrack) { aecTrack.onended = null; aecTrack.stop(); }
+            aecTrack = s.getAudioTracks()[0]; fillMics(); aecTrack.onended = freshTrack;
             micLog('echo-cancelled mic ready ' + JSON.stringify(aecTrack.getSettings()));
             // A session already running on the default mic never switches: abort it, the 'end' hook restarts it on this track.
             if (mic && micRunning) { try { origAbort.call(mic); } catch { } }
