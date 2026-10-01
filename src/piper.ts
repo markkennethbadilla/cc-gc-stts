@@ -1,13 +1,13 @@
 // Spec 038. The window's voice is Piper (OHF-Voice/piper1-gpl), synthesized on this PC: no
 // online speech. mkb-agentops setup-stts.ps1 installs the pinned piper-tts into a venv and the
 // pinned voices under PIPER_HOME. The daemon starts Piper's own HTTP server on first use and
-// proxies it. The page cuts text at punctuation (/voice/split), renders up to three clips ahead
+// proxies it. The page cuts text into sentences (/voice/split), renders up to three clips ahead
 // (/voice/clip) and falls back to a local Windows voice when a clip fails.
 import type http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { segment } from './clauses.ts';
+import { segment } from './sentences.ts';
 
 export const PIPER_HOME = process.env.STTS_PIPER_HOME ||
   path.join(process.env.LOCALAPPDATA || '', 'cc-gc-stts', 'piper');
@@ -36,7 +36,7 @@ function piper(): Promise<void> {
     const vs = installedVoices();
     if (!fs.existsSync(PY) || !vs.length) throw new Error(`piper not installed under ${PIPER_HOME} (run mkb-agentops setup-stts.ps1 -Apply)`);
     const model = vs.includes(DEFAULT_VOICE) ? DEFAULT_VOICE : vs[0];
-    proc = spawn(PY, ['-m', 'piper.http_server', '--host', '127.0.0.1', '--port', String(PORT), '-m', path.join(VOICES, model + '.onnx'), '--data-dir', VOICES],
+    proc = spawn(PY, ['-m', 'piper.http_server', '--host', '127.0.0.1', '--port', String(PORT), '-m', path.join(VOICES, model + '.onnx'), '--data-dir', VOICES, '--sentence-silence', '0.2'],
       { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
     proc.stderr?.on('data', (d) => { const s = String(d).trim(); if (/error|warn/i.test(s)) log(s.slice(0, 300)); });
     proc.on('exit', (c) => { log(`server exited ${c}`); proc = null; ready = null; });

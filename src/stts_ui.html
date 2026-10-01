@@ -1578,8 +1578,8 @@
       /* ---- spec 038: Piper voices, synthesized on this PC ----
          speechSynthesis.speak/cancel/speaking/pending are replaced, so upstream and the rest of
          this block (rate, barge-in) keep working unchanged.
-         Each utterance is cut at every punctuation mark by the daemon (/voice/split, the call
-         bot's clauses()), up to three clips render ahead while one plays (/voice/clip, Piper's
+         Each utterance is cut into sentences by the daemon (/voice/split, spec 038), up to
+         three clips render ahead while one plays (/voice/clip, Piper's
          own HTTP server run by the daemon). A clip that fails is spoken by a local Windows voice
          instead, and the status line says so. Nothing spoken goes over the network. */
       const PIPER_DEFAULT = 'en_US-lessac-medium';

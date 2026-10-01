@@ -7,7 +7,7 @@ const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const sentences = (t) => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(t)]
   .map((s) => s.segment.trim()).filter(Boolean);
 
-test('sentence cuts only, one utterance per sentence, guidance asks for many marks (spec 038)', () => {
+test('sentence cuts only, one utterance per sentence, no punctuation guidance (spec 038)', () => {
   for (let round = 0; round < 3; round++) {
     for (const f of ['src/stts_ui.html', 'dist/stts_ui.html']) {
       const html = read(f);
@@ -26,7 +26,7 @@ test('sentence cuts only, one utterance per sentence, guidance asks for many mar
     assert.deepEqual(sentences('no period at all'), ['no period at all']);
     assert.deepEqual(sentences('   '), []);
     for (const f of ['commands/stts.md', 'commands/stts.toml', 'src/stts-mcp-server.ts']) {
-      assert.match(read(f).replace(/'\s*\+\s*'/g, ''), /use as MANY ?punctuation marks as read naturally/, f);
+      assert.doesNotMatch(read(f).replace(/'\s*\+\s*'/g, ''), /punctuation marks/, f);
     }
   }
 });

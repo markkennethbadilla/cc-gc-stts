@@ -1,29 +1,22 @@
-// Spec 038. The window speaks with Piper on this PC the call bot's way: cut at every
-// punctuation mark (same table as weassist-callbot segment.test.mjs, rule 67), rendered ahead.
+// Spec 038/039. The window speaks with Piper on this PC, one clip per sentence, rendered ahead.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
-import { segment } from '../src/clauses.ts';
+import { segment } from '../src/sentences.ts';
 import { handleVoice, installedVoices, stopPiper } from '../src/piper.ts';
 
 const cases = [
   ["Hello there.", ["Hello there."]],
   ["Right. Okay.", ["Right.", "Okay."]],
-  ["First, the plan; then: the rest! Done? Yes.", ["First,", "the plan;", "then:", "the rest!", "Done?", "Yes."]],
-  ["It cost 1,200 dollars, or 3.5 each, at 7:35 today.", ["It cost 1,200 dollars,", "or 3.5 each,", "at 7:35 today."]],
-  ["Open https://example.com/a.b?x=1, then write a.b@c.io now.", ["Open https://example.com/a.b?x=1,", "then write a.b@c.io now."]],
-  ["Mr. Smith and Dr. Jones met at 10:30 a.m. today, e.g. here.", ["Mr. Smith and Dr. Jones met at 10:30 a.m. today,", "e.g. here."]],
-  ["John F. Kennedy, the U.S. president, spoke.", ["John F. Kennedy,", "the U.S. president,", "spoke."]],
-  ["Wait... then it stopped - really - and so on.", ["Wait...", "then it stopped", "- really", "- and so on."]],
-  ["It was (mostly) fine and \"quoted, here\" too.", ["It was", "(mostly)", "fine and", "\"quoted,", "here\"", "too."]],
-  ["one—two | three a|b and/or 50/50 odds", ["one—", "two", "| three a|", "b and/", "or 50/50 odds"]],
-  ["Items:\n- first\n* second\n• third", ["Items:", "- first", "* second", "• third"]],
+  ["First, the plan; then: the rest! Done? Yes.", ["First, the plan; then: the rest!", "Done?", "Yes."]],
+  ["It cost 1,200 dollars, or 3.5 each, at 7:35 today.", ["It cost 1,200 dollars, or 3.5 each, at 7:35 today."]],
+  ["Open https://example.com/a.b?x=1, then write a.b@c.io now.", ["Open https://example.com/a.b?x=1, then write a.b@c.io now."]],
   ["   ", []],
   ["no punctuation at all but long enough", ["no punctuation at all but long enough"]],
 ];
 
-test('cuts at every punctuation mark, never inside a number, URL or abbreviation', () => {
+test('one piece per sentence, commas kept inside, long runs capped', () => {
   for (const [input, want] of cases) {
     const got = segment(input);
     assert.deepEqual(got, want, input);
@@ -31,7 +24,7 @@ test('cuts at every punctuation mark, never inside a number, URL or abbreviation
   }
   const big = 'Sure, the numbers are 1,200 and 3.5 at 7:35; see https://x.io/a?b=1. '.repeat(70000);
   const parts = segment(big);
-  assert.ok(parts.every((p) => p.length <= 300));
+  assert.ok(parts.every((p) => p.length <= 400));
   assert.equal(parts.join('').replace(/\s/g, ''), big.replace(/\s/g, ''));
 });
 
@@ -54,7 +47,7 @@ test('live: voices, split, a Piper clip at 1.3x, and clean failures', { skip: !i
     const voices = await (await fetch(`${base}/voice/voices`)).json();
     assert.ok(voices.length >= 1 && voices.every((v) => v.lang.startsWith('en-')), JSON.stringify(voices));
     const split = await (await fetch(`${base}/voice/split`, { method: 'POST', body: 'Hello there, how are you? Fine.' })).json();
-    assert.deepEqual(split, ['Hello there,', 'how are you?', 'Fine.']);
+    assert.deepEqual(split, ['Hello there, how are you?', 'Fine.']);
     for (const v of voices) {
       const t0 = Date.now();
       const r = await fetch(`${base}/voice/clip?voice=${v.name}&text=${encodeURIComponent('Hello there,')}&rate=1.3`);

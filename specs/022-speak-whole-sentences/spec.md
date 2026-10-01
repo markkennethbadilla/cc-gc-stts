@@ -3,31 +3,29 @@
 ## What it does
 
 `startSpeaking` (upstream code) queues one `SpeechSynthesisUtterance` per
-sentence. Since spec 038 each utterance is cut again, at every punctuation
-mark, into clips rendered by Piper on this PC, so where the agent
-puts punctuation decides where audio starts sooner. The agent's phrasing rule
-is the call bot's: short phrases, as many punctuation marks as read naturally
-(Mark 2026-10-01, rule 67).
+sentence, and the Piper shim (spec 038) renders one clip per sentence (spec
+039). The agent writes normal, natural sentences; there is no punctuation
+guidance.
 
 ## Why it exists
 
-Mark (2026-10-01): stts and the call bot use the same voices and the same
-latency technique, so the agent writes for both the same way. The earlier
-"periods only" rule existed because every browser utterance boundary was a
-long pause; clips rendered ahead (spec 038) have no such pause.
+Mark (2026-10-01): with Piper on this PC there is no per-request network
+cost, so the punctuation-clip workaround and its writing rules are gone and
+Piper's natural pauses are back.
 
 ## How it works
 
 - `startSpeaking` in `src/stts_ui.html` cuts the request into sentences with
   `Intl.Segmenter`; a `localService` browser voice gets one utterance per part
-  (spec 033). Spec 038's shim takes each utterance and cuts it into clips.
+  (spec 033). Spec 038's shim renders each sentence as one clip.
 - The microphone resumes only when nothing is left queued (`synth.pending`
   is false).
 - Long content is cut on the server by `toParts` in `src/read-aloud.ts`
   (parts of at most 1000 characters); Stop and resume by part (spec 013) work
   unchanged.
-- The phrasing guidance lives in `commands/stts.md`, `commands/stts.toml` and
-  the `tts` tool description in `src/stts-mcp-server.ts`.
+- `commands/stts.md`, `commands/stts.toml` and the `tts` tool description in
+  `src/stts-mcp-server.ts` carry no punctuation rule (test
+  `one-utterance.test.mjs`).
 
 ## What it reads and writes
 

@@ -13,7 +13,7 @@ Windows voices as the fallback. Every clip and utterance is logged to
 Mark (2026-10-01): no online text-to-speech. The online path (spec 034,
 edge-tts-universal) went silent mid-session with nothing in the log: the page's
 clip queue waited forever on one stalled render, so every later reply was
-silent. Spec 034 is deleted; git keeps its history. Piper was picked over
+silent. Spec 034 is deleted; git keeps its history. Clips are whole sentences: Piper adds its natural pauses (`--sentence-silence 0.2` between sentences in one clip), nothing is trimmed, and the agent gets no punctuation rules (Mark 2026-10-01). Piper was picked over
 Kokoro because it is lighter (CPU only, about 60 MB per voice, a short clip
 renders in well under a second).
 
@@ -26,11 +26,11 @@ renders in well under a second).
 - `src/piper.ts`: on the first clip the daemon starts Piper's own HTTP server
   (`python -m piper.http_server`, port 15987, `127.0.0.1` only) and proxies
   `/voice/voices` (installed voices), `/voice/split` (the call bot's
-  punctuation cut, `src/clauses.ts`) and `/voice/clip` (one WAV; rate becomes
+  sentence cut, `src/sentences.ts`) and `/voice/clip` (one WAV; rate becomes
   `length_scale = 1 / rate`, so the 1.3x default of spec 021 holds). A render
   has a 20 s limit (first use of a voice loads it, about 6 s). The page asks for the voice list on load, which starts the server (about 8 s).
 - `src/stts_ui.html` replaces `speechSynthesis.speak/cancel/speaking/pending`:
-  each utterance is cut at punctuation, up to three clips render ahead while
+  each utterance is cut into sentences (spec 038), up to three clips render ahead while
   one plays through WebAudio (volume through a gain node). A clip fetch has a
   25 s limit and playback a watchdog, so one stalled clip can never silence
   the queue again. A failed clip is spoken by a local Windows voice and the
@@ -46,7 +46,7 @@ renders in well under a second).
 |---|---|---|
 | Engine | Piper, local | Microsoft online voice (edge-tts-universal) |
 | Why | runs on Mark's PC | runs on the server IP with no local voices; its own helper owns any change there |
-| Cut and render-ahead | same `clauses()` table, three ahead | same |
+| Cut and render-ahead | one clip per sentence, three ahead, Piper pauses kept | one clip per sentence, render-ahead |
 
 ## What it reads and writes
 
