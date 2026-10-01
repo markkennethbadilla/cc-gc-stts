@@ -26,6 +26,7 @@ All in `src/stts_ui.html`, with CSS media queries (no script does layout):
 - Text is 17 pixels (16 in the strip) with 1.62 line height, the house type
   rule (rule 62). Long words wrap instead of scrolling sideways.
 - Each time live or final words are written in, the box scrolls to the bottom.
+- Settings opens in a native HTML popover (the browser's top layer), so the window edge or the end bar never clips it. It sits above the end bar, at most 520 pixels wide and 8 pixels in from each side, scrolls when the window is short, and keeps its rows visible even where the strip rules hide other history bars. Click outside or Escape closes it.
 - The daemon opens the window at 1600 by 600 and sets no minimum size, so
   nothing outside the page blocks narrowing.
 

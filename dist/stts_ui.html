@@ -740,6 +740,7 @@
     </div>
   </div><!-- /panels-row -->
 
+  <div id="voice-missing" role="status" hidden style="padding:4px 10px;font-size:12px;text-align:center;background:var(--hover-color);color:var(--text-color);border-top:1px solid var(--border-color)"></div>
   <div class="end-bar">
     <button id="end-btn">End<span class="btn-text">conversation</span></button>
   </div>
@@ -1588,10 +1589,11 @@
       const nativeSpeak = SS.speak, nativeCancel = SS.cancel;
       const nativeSpeaking = Object.getOwnPropertyDescriptor(SS, 'speaking').get;
       let piperVoices = [];
-      fetch('/voice/voices').then(r => (r.ok ? r.json() : [])).then(v => {
+      const loadPiperVoices = () => fetch('/voice/voices').then(r => (r.ok ? r.json() : [])).then(v => {
         piperVoices = v;
         window.dispatchEvent(new Event('pipervoices'));
       }).catch(() => { });
+      loadPiperVoices();
       // Fallback and picker: local (localService) Windows voices only, a natural one first.
       function localVoice(voices) {
         const local = voices.filter((v) => v.localService), en = (v) => v.lang.startsWith('en');
@@ -1603,7 +1605,24 @@
         const s = localStorage.getItem(LS_VOICE);
         if (s && piperVoices.some(x => x.name === s)) return s;
         if (s && speechSynthesis.getVoices().some(x => x.name === s && x.localService)) return null;   // a Windows voice was picked
-        return piperVoices.some(x => x.name === PIPER_DEFAULT) ? PIPER_DEFAULT : piperVoices[0]?.name || null;
+        const want = s || PIPER_DEFAULT;
+        if (piperVoices.some(x => x.name === want)) {
+          const el = document.getElementById('voice-missing');
+          if (el) el.hidden = true;
+          return want;
+        }
+        /* The picked (or default) voice is not installed, or was installed after this page loaded.
+           Never swap it silently and never save the stand-in: say so, recheck the list for next time. */
+        const sub = piperVoices[0]?.name || null;
+        voiceMissing(want, sub);
+        loadPiperVoices();
+        return sub;
+      }
+      function voiceMissing(want, sub) {
+        const msg = `Voice ${want} is not installed; speaking ${sub || 'a Windows voice'} instead.`;
+        ttsLog('voice missing: ' + want);
+        const el = document.getElementById('voice-missing');
+        if (el) { el.textContent = msg; el.hidden = false; }
       }
       const ttsLog = (text) => { try { sendSocket({ type: 'log', text: 'tts ' + text }); } catch { } };
       const audio = new AudioContext();
@@ -1786,13 +1805,17 @@
         #settings-btn:active { transform: translateY(-50%) scale(.92); }
         #settings-btn svg { transition: transform .25s ease; }
         #settings-btn.open svg { transform: rotate(60deg); }
+        /* Native popover (top layer): never clipped by the end bar or the window; the browser does
+           light dismiss and Escape. Pinned above the end bar, inside the viewport at any size. */
         #settings-pop {
-          position: absolute; left: 14px; bottom: calc(100% + 8px); z-index: 50;
-          width: min(520px, calc(100vw - 28px)); display: none; flex-direction: column;
-          border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;
-          background: var(--bg-color); box-shadow: var(--shadow);
+          position: fixed; inset: auto 8px 56px 8px; margin: 0 auto; padding: 0;
+          width: min(520px, calc(100vw - 16px)); max-height: calc(100vh - 72px); overflow: auto;
+          flex-direction: column; border: 1px solid var(--border-color); border-radius: 10px;
+          background: var(--bg-color); color: var(--text-color); box-shadow: var(--shadow);
         }
-        #settings-pop.open { display: flex; }
+        #settings-pop:popover-open { display: flex; }
+        /* The narrow and short-window rules hide .history-bar; the settings rows must still show. */
+        #settings-pop .history-bar { display: flex; flex-wrap: wrap; }
         #settings-pop .history-bar:last-child { border-bottom: none; }
         #settings-pop .history-label { min-width: 68px; }
         #settings-pop input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent-color); }
@@ -1805,18 +1828,9 @@
       settingsBtn.tabIndex = -1;
       settingsBtn.title = 'Settings: voice, rate, auto-send, silence';
       settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg><span>Settings</span>';
-      settingsBtn.onclick = (e) => {
-        e.stopPropagation();
-        const open = !settingsPop.classList.contains('open');
-        settingsPop.classList.toggle('open', open);
-        settingsBtn.classList.toggle('open', open);
-      };
-      document.addEventListener('mousedown', (e) => {
-        if (settingsPop.classList.contains('open') && !e.target.closest('#settings-pop, #settings-btn')) {
-          settingsPop.classList.remove('open');
-          settingsBtn.classList.remove('open');
-        }
-      });
+      settingsPop.popover = 'auto';
+      settingsBtn.popoverTargetElement = settingsPop;
+      settingsPop.addEventListener('toggle', (e) => settingsBtn.classList.toggle('open', e.newState === 'open'));
       endBar.appendChild(settingsBtn);
       endBar.appendChild(settingsPop);
 
@@ -1849,7 +1863,11 @@
         const saved = localStorage.getItem(LS_VOICE) || '';
         const opt = (v) => `<option value="${v.name}"${v.name === saved ? ' selected' : ''}>${v.name} (${v.lang})</option>`;
         // Spec 038: installed Piper voices first; local Windows voices are the fallback. No online voices.
+        // A saved pick that is not installed stays shown and selected, marked, so it is never
+        // replaced by whatever option happens to render first.
+        const known = piperVoices.some(v => v.name === saved) || voices.some(v => v.name === saved && v.localService);
         voiceSelect.innerHTML = `<option value="">Default (${PIPER_DEFAULT})</option>` +
+          (saved && !known ? `<option value="${saved}" selected>${saved} (not installed)</option>` : '') +
           (piperVoices.length ? '<optgroup label="Piper (this PC)">' + piperVoices.map(opt).join('') + '</optgroup>' : '') +
           '<optgroup label="Windows (this PC)">' + voices.filter(v => v.localService).map(opt).join('') + '</optgroup>';
       }
