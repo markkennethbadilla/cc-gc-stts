@@ -4,9 +4,8 @@
   "plugins": [
     {
       "name": "stts",
-      "source": "./", 
-      "description": "Local development version of stts claude plugin",
-      "version": "1.0.0"
+      "source": "./",
+      "description": "Local development version of stts claude plugin"
     }
   ]
 }
