@@ -28,7 +28,7 @@ renders in well under a second).
   (`python -m piper.http_server`, port 15987, `127.0.0.1` only) and proxies
   `/voice/voices` (installed voices), `/voice/split` (the call bot's
   sentence cut, `src/sentences.ts`) and `/voice/clip` (one WAV; rate becomes
-  `length_scale = 1 / rate`, so the 1.3x default of spec 021 holds). A render
+  `length_scale = 1 / rate`, so the 1.1x default of spec 021 holds). A render
   has a 20 s limit (first use of a voice loads it, about 6 s). The page asks for the voice list on load, which starts the server (about 8 s).
 - `src/stts_ui.html` replaces `speechSynthesis.speak/cancel/speaking/pending`:
   each utterance is cut into sentences (spec 038), up to three clips render ahead while

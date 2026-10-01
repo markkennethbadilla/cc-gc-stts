@@ -38,7 +38,7 @@ test('the page routes speech through the local daemon, Windows voice as fallback
   }
 });
 
-test('live: voices, split, a Piper clip at 1.3x, and clean failures', { skip: !installedVoices().length && 'piper not installed' }, async () => {
+test('live: voices, split, a Piper clip at 1.1x, and clean failures', { skip: !installedVoices().length && 'piper not installed' }, async () => {
   const srv = http.createServer(async (req, res) => {
     if (!(await handleVoice(req, res, new URL(req.url, 'http://x')))) { res.writeHead(404); res.end(); }
   }).listen(0);
@@ -50,7 +50,7 @@ test('live: voices, split, a Piper clip at 1.3x, and clean failures', { skip: !i
     assert.deepEqual(split, ['Hello there, how are you?', 'Fine.']);
     for (const v of voices) {
       const t0 = Date.now();
-      const r = await fetch(`${base}/voice/clip?voice=${v.name}&text=${encodeURIComponent('Hello there,')}&rate=1.3`);
+      const r = await fetch(`${base}/voice/clip?voice=${v.name}&text=${encodeURIComponent('Hello there,')}&rate=1.1`);
       assert.equal(r.status, 200, v.name);
       const wav = Buffer.from(await r.arrayBuffer());
       assert.ok(wav.length > 2000 && wav.subarray(0, 4).toString() === 'RIFF', `${v.name} ${wav.length}`);

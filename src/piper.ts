@@ -78,7 +78,7 @@ export async function handleVoice(req: http.IncomingMessage, res: http.ServerRes
       if (!text.trim()) throw new Error('no text');
       const vs = installedVoices(), voice = url.searchParams.get('voice') || (vs.includes(DEFAULT_VOICE) ? DEFAULT_VOICE : vs[0]);
       if (!vs.includes(voice)) throw new Error('voice not installed: ' + voice);
-      const rate = num(url.searchParams.get('rate'), 0.5, 2, 1.3);
+      const rate = num(url.searchParams.get('rate'), 0.5, 2, 1.1);
       await piper();
       const t0 = Date.now();
       const r = await fetch(`http://127.0.0.1:${PORT}/synthesize`, {
