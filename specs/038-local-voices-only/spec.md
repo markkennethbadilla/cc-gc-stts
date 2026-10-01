@@ -29,6 +29,7 @@ renders in well under a second).
   with research-only or non-commercial data (lessac, amy, ryan, hfc) or an
   unclear licence (alan, jenny_dioco) are not installed; `setup-stts.ps1`
   deletes any voice that is not pinned.
+- Default voice: `en_GB-jenny_dioco-medium` (Mark 2026-10-01: a British voice; stts is internal, so voice licences are not a concern).
 - `src/piper.ts`: on the first clip the daemon starts Piper's own HTTP server
   (`python -m piper.http_server`, port 15987, `127.0.0.1` only) and proxies
   `/voice/voices` (installed voices), `/voice/split` (the call bot's
