@@ -157,7 +157,10 @@ async function ensureChrome() {
           '--no-first-run',
           '--no-default-browser-check',
           '--disable-infobars',
-          '--test-type',   // hides Chrome's unsupported-flag infobar (the mic grant flag below)
+          // Spec 039. Mark-approved flags; each checked against peter.sh/experiments/chromium-command-line-switches on 2026-10-02.
+          // --test-type hides the unsupported-flag infobar the mic flag raises. AutomationControlled is a blink feature, not a switch.
+          '--test-type',
+          '--disable-blink-features=AutomationControlled',
           `--app=http://127.0.0.1:${FIXED_PORT}/`,
           '--window-size=1600,600',
           '--autoplay-policy=no-user-gesture-required',

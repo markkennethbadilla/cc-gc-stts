@@ -7,7 +7,7 @@ const html = readFileSync(new URL('../src/stts_ui.html', import.meta.url), 'utf8
 
 test('Chrome is launched with a real grant, not the prompt-only auto-accept', () => {
   assert.match(daemon, /'--use-fake-ui-for-media-stream'/);
-  assert.match(daemon, /'--test-type'/);   // hides the unsupported-flag infobar
+  assert.match(daemon, /'--test-type'/); assert.match(daemon, /AutomationControlled/);   // hides the unsupported-flag infobar
 });
 
 test('the list refills when the settings popover opens', () => {

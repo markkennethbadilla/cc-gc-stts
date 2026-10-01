@@ -14,7 +14,7 @@ changing the Windows default.
 
 ## How it works
 
-The daemon launches Chrome with `--use-fake-ui-for-media-stream`, which really grants the mic, with `--test-type` hiding Chrome's unsupported-flag infobar (the old `--auto-accept-camera-and-microphone-capture` left permission at "prompt", so Chrome hid every device and label and the list held only System default). In `src/stts_ui.html`, the list comes from `enumerateDevices()` (refreshed when the popover opens, on
+The daemon launches Chrome with `--use-fake-ui-for-media-stream`, which really grants the mic, with `--test-type` hiding Chrome's unsupported-flag infobar and `--disable-blink-features=AutomationControlled`, next to the autoplay, timer-throttling and renderer-backgrounding flags, all checked against peter.sh on 2026-10-02 (the old `--auto-accept-camera-and-microphone-capture` left permission at "prompt", so Chrome hid every device and label and the list held only System default). In `src/stts_ui.html`, the list comes from `enumerateDevices()` (refreshed when the popover opens, on
 `devicechange` and after the mic is granted, since names appear only then).
 The saved `deviceId` goes into the echo-cancelled `getUserMedia` request from
 spec 037 as `ideal`, so a device that was unplugged quietly falls back to the
