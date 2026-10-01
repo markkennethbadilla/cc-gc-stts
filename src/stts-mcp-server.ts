@@ -56,7 +56,9 @@ const NO_SLEEP_NOTE =
   ' Never sleep or block on another tool to wait for him: to wait, call stt again (the default ' +
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
   'Use the default idleSec for every normal wait: a background result arrives on its own and interrupts the listen. ' +
-  'The one exception (spec 023): a listen made only because a turn reads unfinished passes idleSec 1.';
+  'The one exception (spec 023): a listen made only because a turn reads unfinished passes idleSec 1. ' +
+  // Spec 026.
+  'A message he types into the chat mid-loop (usually something too long to say) is a turn, not an exit: handle it, answer by voice, and go straight back to listening. Typing never ends the conversation.';
 // Spec 019: a turn is sent after 0.7 s of quiet (1 s when it trails off), and the agent
 // judges whether the thought is finished; when unsure, it listens again rather than answer.
 const midThought = (again: string) =>
