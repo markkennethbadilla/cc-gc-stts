@@ -23,6 +23,12 @@ renders in well under a second).
   `%LOCALAPPDATA%/cc-gc-stts/piper/venv` with the pinned `piper-tts[http]`
   and downloads the pinned voices (Hugging Face `rhasspy/piper-voices` tag
   `v1.0.0`) into `.../piper/voices`. Pins live in mkb-agentops `versions.json`.
+- Voices (commercial use only, Mark 2026-10-01): `en_US-kristin-medium`
+  (default) and `en_GB-cori-medium` (LibriVox, public domain), and
+  `en_GB-alba-medium` (CC BY 4.0: credit the Edinburgh CSTR dataset). Voices
+  with research-only or non-commercial data (lessac, amy, ryan, hfc) or an
+  unclear licence (alan, jenny_dioco) are not installed; `setup-stts.ps1`
+  deletes any voice that is not pinned.
 - `src/piper.ts`: on the first clip the daemon starts Piper's own HTTP server
   (`python -m piper.http_server`, port 15987, `127.0.0.1` only) and proxies
   `/voice/voices` (installed voices), `/voice/split` (the call bot's

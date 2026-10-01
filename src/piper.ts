@@ -14,7 +14,7 @@ export const PIPER_HOME = process.env.STTS_PIPER_HOME ||
 const PY = path.join(PIPER_HOME, 'venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 const VOICES = path.join(PIPER_HOME, 'voices');
 const PORT = Number(process.env.STTS_PIPER_PORT) || 15987;
-export const DEFAULT_VOICE = 'en_US-lessac-medium';
+export const DEFAULT_VOICE = 'en_US-kristin-medium';
 const log = (s: string) => console.error(`${new Date().toISOString()} piper ${s}`);
 
 const num = (v: string | null, lo: number, hi: number, d: number) => {
