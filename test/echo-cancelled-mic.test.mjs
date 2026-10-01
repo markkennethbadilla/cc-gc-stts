@@ -21,7 +21,7 @@ test('no track yet, or an ended one: default mic', () => {
   assert.deepEqual(run({ readyState: 'ended' }), []);
 });
 test('all three browser processing stages are asked for', () => {
-  assert.match(html, /getUserMedia\(\{ audio: \{ echoCancellation: true, noiseSuppression: true, autoGainControl: true \} \}\)/);
+  assert.match(html, /getUserMedia\(\{ audio: \{ echoCancellation: true, noiseSuppression: true, autoGainControl: true, \.\.\./);
 });
 test('no text echo filter is left', () => {
   for (const f of ['stripEcho', 'stripTail', 'isSpokenBack', 'ownVoice', 'bargeIn']) assert.ok(!html.includes(f), f);
