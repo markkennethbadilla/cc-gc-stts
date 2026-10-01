@@ -160,7 +160,7 @@ async function ensureChrome() {
           `--app=http://127.0.0.1:${FIXED_PORT}/`,
           '--window-size=1600,600',
           '--autoplay-policy=no-user-gesture-required',
-          '--auto-accept-camera-and-microphone-capture',
+          '--use-fake-ui-for-media-stream',
           // Spec 002. The window is usually behind the terminal, and Chromium
           // throttles a hidden page's timers (to once a minute after a while),
           // which delayed the barge-in pause by tens of seconds (2026-09-09).
@@ -244,7 +244,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleVoice(req, res, url)) return;   // spec 038
 
   if (req.method === 'GET' && url.pathname === '/api/ping') {
-    res.writeHead(200);
+    res.writeHead(200, { 'X-Stts-Dir': __dirname });   // spec 041
     res.end('ok');
     return;
   }

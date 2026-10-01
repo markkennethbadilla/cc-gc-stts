@@ -14,7 +14,7 @@ changing the Windows default.
 
 ## How it works
 
-In `src/stts_ui.html`, the list comes from `enumerateDevices()` (refreshed on
+The daemon launches Chrome with `--use-fake-ui-for-media-stream`, which really grants the mic (the old `--auto-accept-camera-and-microphone-capture` left permission at "prompt", so Chrome hid every device and label and the list held only System default). In `src/stts_ui.html`, the list comes from `enumerateDevices()` (refreshed when the popover opens, on
 `devicechange` and after the mic is granted, since names appear only then).
 The saved `deviceId` goes into the echo-cancelled `getUserMedia` request from
 spec 037 as `ideal`, so a device that was unplugged quietly falls back to the

@@ -49,6 +49,10 @@ export interface TtsConfig {
 
 type PingResult = 'ours' | 'foreign' | 'closed';
 
+// Spec 041. The daemon names its own directory in a ping header; a daemon from
+// another plugin version (or an old one with no header) is stale.
+let daemonDir = '';
+
 function pingDaemon(): Promise<PingResult> {
   return new Promise((resolve) => {
     const req = http.request(
@@ -64,6 +68,7 @@ function pingDaemon(): Promise<PingResult> {
         res.on('data', (c: Buffer) => chunks.push(c));
         res.on('end', () => {
           const body = Buffer.concat(chunks).toString('utf-8').trim();
+          daemonDir = String(res.headers['x-stts-dir'] || '');
           resolve(res.statusCode === 200 && body === 'ok' ? 'ours' : 'foreign');
         });
       }
@@ -129,7 +134,31 @@ function spawnDaemon(): void {
   if (typeof out === 'number') fs.closeSync(out);
 }
 
+function httpCall(method: string, p: string): Promise<string> {
+  return new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port: FIXED_PORT, path: p, method, timeout: 1000 }, (res) => {
+      let b = '';
+      res.on('data', (c) => (b += c));
+      res.on('end', () => resolve(b));
+    });
+    req.on('error', () => resolve(''));
+    req.on('timeout', () => { req.destroy(); resolve(''); });
+    req.end();
+  });
+}
+
+// Spec 041. Shut down a daemon from another plugin directory unless a voice
+// window is live (it then keeps serving until it ends). True when it was stopped.
+export async function stopStaleDaemon(): Promise<boolean> {
+  if (await pingDaemon() !== 'ours' || daemonDir === path.dirname(resolveDaemonScript())) return false;
+  try { if (JSON.parse(await httpCall('GET', '/barge')).open) return false; } catch {}
+  await httpCall('POST', '/api/shutdown');
+  for (let i = 0; i < 30 && await pingDaemon() === 'ours'; i++) await new Promise((r) => setTimeout(r, 100));
+  return true;
+}
+
 async function ensureDaemon(): Promise<void> {
+  await stopStaleDaemon();
   const initial = await pingDaemon();
   if (initial === 'ours') return;
   if (initial === 'foreign') {
