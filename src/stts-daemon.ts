@@ -157,6 +157,7 @@ async function ensureChrome() {
           '--no-first-run',
           '--no-default-browser-check',
           '--disable-infobars',
+          '--test-type',   // hides Chrome's unsupported-flag infobar (the mic grant flag below)
           `--app=http://127.0.0.1:${FIXED_PORT}/`,
           '--window-size=1600,600',
           '--autoplay-policy=no-user-gesture-required',
