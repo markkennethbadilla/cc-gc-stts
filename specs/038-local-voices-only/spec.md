@@ -36,6 +36,7 @@ renders in well under a second).
   25 s limit and playback a watchdog, so one stalled clip can never silence
   the queue again. A failed clip is spoken by a local Windows voice and the
   status line says so.
+- Each clip is trimmed to its speech, so the page waits between clips: 350 ms after a sentence end (. ? !), 150 ms after any other cut. Stop or a new request cancels the wait.
 - A picked or default voice that is not installed (or was installed after the window opened) is never swapped silently: a line above the End button says which voice is missing and what is speaking instead, the page rechecks the voice list for the next reply, the saved pick is never overwritten, and the picker shows it marked (not installed). The log says `page tts voice missing`.
 - A Windows voice picked in the bar bypasses Piper and speaks each part as one
   utterance (spec 033).
