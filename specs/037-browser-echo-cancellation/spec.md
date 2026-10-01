@@ -57,3 +57,14 @@ or `echo-cancelled mic failed` to daemon.log.
 `node --test test/echo-cancelled-mic.test.mjs`. Live: daemon.log shows
 `echo-cancelled mic ready`; with speakers, a spoken reply leaves nothing in
 the prompt box.
+
+## Fallback while the voice plays
+
+Live on laptop speakers (2026-10-01) the echo canceller still let the agent's
+voice through ("It's a text sentence" for "This is a test sentence"). So while
+`speechSynthesis.speaking` is true, every recognition result is discarded and
+its index remembered; a result that was open during playback stays discarded
+when it closes. The recognizer is never stopped, so the first words after the
+voice ends are kept with no start-up gap. Words said over the agent are lost;
+that is the price of speakers. No text matching. `node --test
+test/echo-cancelled-mic.test.mjs` checks it.

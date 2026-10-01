@@ -2025,7 +2025,7 @@
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
-            if (this === mic) { micRunning = false; endedAt = Date.now(); saveIdleInterim(); }
+            if (this === mic) { micRunning = false; endedAt = Date.now(); playIdx = -1; saveIdleInterim(); }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
             // for the rest of the session. Retry with a widening delay, capped at 2 s.
@@ -2262,9 +2262,15 @@
       cancel = withSuppressed(cancel);
       sendBtn.onclick = submit;
 
+      /* Spec 037 fallback. Chrome's echo canceller still let the agent's voice through on laptop
+         speakers (2026-10-01). While the agent's voice plays, every result is discarded, and so is
+         any result that was open then (by index, no text matching). The recognizer keeps running,
+         so the first result after playback is accepted with no start-up gap. */
+      let playIdx = -1;
       function onResult(event) {
         let finalText = '', interim = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (synth.speaking) { playIdx = event.results.length - 1; return; }
+        for (let i = Math.max(event.resultIndex, playIdx + 1); i < event.results.length; ++i) {
           const t = event.results[i][0].transcript;
           if (event.results[i].isFinal) finalText += t; else interim += t;
         }

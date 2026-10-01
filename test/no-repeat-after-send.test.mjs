@@ -21,7 +21,7 @@ function page() {
   const fns = {
     clearInterim: () => { s.prov = null; }, keepCaret: () => {},
     armPause: () => {}, armBarge: () => {}, stripCommands: (t) => t, mic: {}, insert,
-    synth: { speaking: false },
+    synth: { speaking: false }, playIdx: -1,
     showInterim: () => {},   // interim stays pending, sent by flushInterim (the auto-send path)
     upstreamOnResult: { call: (_, e) => insert(e.results[0][0].transcript.trim()) },
   };
