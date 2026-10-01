@@ -24,7 +24,7 @@ function page() {
   const api = new Function('SR', 'origStart', 'env', 'synth', `
     let mic = null, upstreamOnResult = null;
     const onResult = () => {}, micAlive = () => {}, saveIdleInterim = () => {}, origAbort = () => { env.aborts++; };
-    const navigator = { mediaDevices: { getUserMedia: () => new Promise(() => {}) } }, micLog = () => {}, localStorage = { getItem: () => null }, fillMics = () => {};
+    const navigator = { mediaDevices: { getUserMedia: () => new Promise(() => {}) } }, micLog = () => {}, localStorage = { getItem: () => null }, fillMics = () => {}, LS_MIC = 'm';
     ${gate.replace(/\bmuted\b/g, 'env.muted')}
     ${wrapper.replace(/\bmuted\b/g, 'env.muted')}
     return {};
