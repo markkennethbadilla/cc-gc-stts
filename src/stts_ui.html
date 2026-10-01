@@ -1687,8 +1687,9 @@
             fire(c.item.u, 'start');   // per clip
             await (a ? playBuf(a, c.item.volume) : playNative(c));
             if (mine !== gen) break;
-            // Clips are trimmed to the speech, so the pause between sentences is added here.
-            if (!c.last) await new Promise(r => setTimeout(r, gapAfter(c.text)));
+            // Clips are trimmed to the speech, so the pause between sentences is added here; each sentence
+            // often arrives as its own utterance, so a queued next utterance also gets the gap.
+            if (!c.last || clips.length || splits) await new Promise(r => setTimeout(r, gapAfter(c.text)));
             if (mine !== gen) break;
             cur = null;
             if (c.last) fire(c.item.u, 'end');

@@ -12,6 +12,6 @@ for (const f of ['src/stts_ui.html', 'dist/stts_ui.html']) {
     const gapAfter = vm.runInNewContext(`(${m[0]})`);
     for (const t of ["it's not worth it.", 'Sound good?', 'Wow!', 'He said "go."', 'done.) ']) assert.equal(gapAfter(t), 350, t);
     for (const t of ['a long run, cut here', 'no punctuation']) assert.equal(gapAfter(t), 150, t);
-    assert.ok(html.includes('if (!c.last) await new Promise(r => setTimeout(r, gapAfter(c.text)));'));
+    assert.ok(html.includes('if (!c.last || clips.length || splits) await new Promise(r => setTimeout(r, gapAfter(c.text)));'));
   });
 }
