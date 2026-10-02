@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
-import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED, BACKGROUND_RESULT } from './protocol.ts';
 import { handleVoice } from './piper.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -206,7 +206,6 @@ function deliverToPage() {
 // reaches the working agent as an addition, not a stop. Spec 003. Whether a
 // request raises the window; the page sends its settings on connect and on
 // change.
-const barge: string[] = [];
 let voiceOwner = ''; // spec 018: session|agent of the agent in the voice loop
 let raiseOnRequest = false;
 
@@ -254,21 +253,30 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/barge') {
-    // Spec 018. The hook runs before EVERY agent's tool calls, background
-    // subagents and other sessions included, and each fetch used to take the
-    // words. So the agent whose hook fires on an stt/tts call (`owner=1`) owns
-    // the voice, and only it (`who` equal to the owner) takes them; anyone else
-    // gets nothing and the words wait. A caller with no `who` (an older hook)
-    // still takes them, as before.
+    // Spec 018/026: an stt/tts caller (`owner=1`) marks who owns the voice.
+    // Spec 042: speech is no longer queued here, so text is always empty.
     const who = url.searchParams.get('who') || '';
     if (who && url.searchParams.get('owner') === '1') voiceOwner = who;
-    const mine = !who || !voiceOwner || who === voiceOwner;
-    const text = mine ? barge.splice(0).join(' ') : '';
     // Spec 015. open: the voice window is connected, so a voice loop is live.
     // The house hook refuses a sleep while it is, so Mark never talks to a dead agent.
     const open = pageSocket?.readyState === WebSocket.OPEN;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ text, open }));
+    res.end(JSON.stringify({ text: '', open }));
+    return;
+  }
+
+  // Spec 043. The agent's SubagentStop hook posts here when a background agent
+  // finishes. An open listen returns BACKGROUND_RESULT at once; the page keeps any
+  // half-said words (released), as at the time limit. No listen open: nothing to do,
+  // the agent sees the result on its own turn.
+  if (req.method === 'POST' && url.pathname === '/notify') {
+    const listening = pending?.config.mode === 'stt';
+    if (listening) {
+      if (pageSocket?.readyState === WebSocket.OPEN) pageSocket.send(JSON.stringify({ type: 'released' }));
+      resolvePending(BACKGROUND_RESULT);
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ interrupted: listening }));
     return;
   }
 
@@ -302,13 +310,6 @@ const server = http.createServer(async (req, res) => {
     } catch {
       res.writeHead(400);
       res.end('bad json');
-      return;
-    }
-    // Spec 042. Speech he finished while the agent worked is already here: a
-    // listen returns it at once instead of waiting for him to speak again.
-    if (config.mode === 'stt' && barge.length) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ text: barge.splice(0).join(' ') }));
       return;
     }
 
@@ -400,15 +401,8 @@ wss.on('connection', (socket) => {
         return;
       case 'complete': {
         let text = typeof msg.text === 'string' ? msg.text : '';
-        // Spec 012. A prompt that lands with no listen pending (the listen was
-        // released at its bound a moment before) is his speech: keep it for the
-        // next listen or the barge-in hook. It used to be dropped here.
-        if (pending?.config.mode !== 'stt') {
-          if (text.trim()) barge.push(text.trim());
-          return;
-        }
-        // Barge-ins nobody fetched during the turn still reach the agent.
-        if (pending?.config.mode === 'stt' && barge.length) text = [barge.splice(0).join(' '), text].filter(Boolean).join(' ');
+        // Spec 042. Speech with no listen open is not kept for later.
+        if (pending?.config.mode !== 'stt') return;
         resolvePending(text);
         return;
       }
@@ -418,8 +412,7 @@ wss.on('connection', (socket) => {
         return;
       case 'nospeech':
         // Spec 010. Nothing heard within idleSec. Only an stt request can end this way.
-        // Spec 012: unless speech is already buffered from between tool calls; that is his answer.
-        if (pending?.config.mode === 'stt') resolvePending(barge.length ? barge.splice(0).join(' ') : NO_SPEECH);
+        if (pending?.config.mode === 'stt') resolvePending(NO_SPEECH);
         return;
       case 'stopped':
         // Spec 013. He stopped the speaking turn; a reading must not go on to its next part.
@@ -429,9 +422,6 @@ wss.on('connection', (socket) => {
         // Spec 008. End conversation, said in a word the agent cannot mistake
         // for speech and does not have to infer from an empty string.
         resolvePending(CONVERSATION_ENDED);
-        return;
-      case 'barge':
-        if (typeof msg.text === 'string' && msg.text.trim()) barge.push(msg.text.trim());
         return;
       case 'log':
         // Spec 011. The page's microphone restarts and recognizer errors, into daemon.log.

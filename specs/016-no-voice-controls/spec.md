@@ -38,9 +38,8 @@ the voice cut replies in half. The same change landed in the WeAssist call bot
   (Listen) returns no effects. The command regexes, the spec 003 additions and
   the idle "repeat" path are deleted, and the cheat-sheet buttons are hidden.
 - While the agent speaks, the mic stays on; its own voice is removed by the
-  browser's echo canceller before recognition (spec 037). Every final goes to `carry` (spec 019); nothing in that
-  branch stops the voice or ends the `tts` call. After the voice ends, `carry`
-  opens the next prompt, or is sent to the daemon as a barge-in after his pause.
+  browser's echo canceller before recognition (spec 037). Nothing heard while the voice plays is kept (spec 042), and
+  nothing stops the voice or ends the `tts` call.
 - The old talk-over path (`isEcho`, the page's `heard` message, the daemon's
   `__STTS_HEARD__` reply, and the `tts` tool's "He spoke while you were
   speaking") is deleted.
@@ -66,9 +65,7 @@ npm run build
 node --test test/*.test.mjs
 ```
 
-Tests: the `tts` branch of the page's result handler keeps every final in
-`carry` and holds no `stopSpeaking`, `synth.cancel`, `resetToIdle`, `heard` or
-`isEcho`; the daemon has no `heard` case; the stop button still sends
+Tests: speech outside a listen is neither kept nor sent (spec 042); the daemon has no `heard` case; the stop button still sends
 `stopped`; no `COMMAND_REGEX` remains. Run three times, all green.
 
 Not tested live: talk over a long reply; the voice

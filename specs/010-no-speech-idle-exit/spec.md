@@ -29,9 +29,8 @@ On 2026-09-28 that was 181 seconds of silence, and it looked like a freeze.
   off. A new listen or a finished turn replaces the timer.
 - **The daemon** (`stts-daemon.ts`) answers `nospeech` by resolving the waiting
   listen with `NO_SPEECH`. Only a listen can end this way.
-- **After it fires**, the microphone is still live. Anything he says while the
-  agent is busy reaches it as a barge-in (spec 002), or is added to the next
-  listen.
+- **After it fires**, the microphone stays live, but nothing said before the
+  next listen opens is kept (spec 042).
 - **The `/stts` prompt** (`commands/stts.md`, `commands/stts.toml`,
   `skills/stts/SKILL.md`) now tells four replies apart: the end marker (stop,
   silently), the no-speech marker (relay a finished result, or listen again

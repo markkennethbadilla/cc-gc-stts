@@ -88,8 +88,7 @@ test('the daemon answers nospeech with the marker, for stt only', () => {
   assert.ok(at > -1, "the daemon does not handle 'nospeech'");
   const branch = daemon.slice(at, daemon.indexOf('return;', at));
   assert.match(branch, /mode === 'stt'/);
-  // Spec 012: speech buffered between tool calls is his answer, so it wins over the marker.
-  assert.match(branch, /resolvePending\(barge\.length \? barge\.splice\(0\)\.join\(' '\) : NO_SPEECH\)/);
+  assert.match(branch, /resolvePending\(NO_SPEECH\)/);   // spec 042: nothing is buffered
 });
 
 test('the marker is ASCII, unmistakable, and not the end marker', () => {

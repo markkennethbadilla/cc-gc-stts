@@ -68,8 +68,8 @@ Three causes, all in the page:
   silently.
 - **During the agent's turn.** The agent's own voice is removed by the browser's
   echo canceller before recognition (spec 037). Talking over it never
-  stops the voice (spec 016). Everything else heard in the agent's turn goes
-  into `carry` (finals) or the held interim (unfinished text, spec 012).
+  stops the voice (spec 016). Nothing else heard in the agent's turn is kept
+  (spec 042).
 
 ### Parity with the call bot
 

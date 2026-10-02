@@ -36,8 +36,7 @@ being lost.
 - **One always-on microphone.** Upstream started and stopped a
   recognizer per request and lost speech in between. The fork starts
   one recognizer and restarts it whenever Edge ends it. Speech heard
-  while the agent is thinking or talking is carried into the next
-  prompt.
+  while no listen is open is not kept (spec 042).
 - **Auto-send after a pause.** On by default, 1 second (spec 019). Counts from
   the last interim result, so a sentence still being recognised is
   never cut. Turn it off to dictate long prompts.

@@ -15,7 +15,7 @@ export const NO_SPEECH = '__STTS_NO_SPEECH__';
 // call budget. Every empty return is a full model round trip over the whole
 // context, so a short default (it was 20) burned tokens on a silent room, and an
 // agent with a stale schema cannot pass a longer one. Agents always use this
-// default: a background result interrupts the listen on its own.
+// default: a finished background agent ends the listen with BACKGROUND_RESULT (spec 043).
 export const DEFAULT_IDLE_SEC = 200;
 
 // Spec 012. A listen reached the tool call's time limit (the client has to return
@@ -25,6 +25,11 @@ export const LISTEN_CONTINUES = '__STTS_LISTEN_CONTINUES__';
 
 // Spec 013, 016. He pressed the stop button. A reading stops here instead of going on.
 export const STOPPED = '__STTS_STOPPED__';
+
+// Spec 043. A background agent finished while a listen was open. The listen ends at
+// once so the agent can speak the result now; what Mark was mid-way through saying
+// is kept by the window for the next listen, as at the time limit.
+export const BACKGROUND_RESULT = '__STTS_BACKGROUND_RESULT__';
 
 // Spec 019 (Mark 2026-09-30): "never cut me off." Speech whose last word is a
 // connector, a filler, a preposition, an article, or a lead-in ("so I was

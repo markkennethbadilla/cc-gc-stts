@@ -7,13 +7,10 @@
   window closes after it is spoken. The daemon stays up so the next
   call is fast. `End conversation` in the window already closed
   everything; it still does.
-- **The Talk panel is live while the agent works.** Upstream greys both
-  panels between requests. The microphone is on the whole time and
-  what Mark says is delivered to the agent (spec 002), so the Talk
-  panel now looks active in that state, its status reads "Agent
-  working. Listening...", and the prompt box shows the live transcript
-  as he speaks. When the pause sends it to the agent the box clears
-  and the status says so. The Listen panel stays grey until the agent
+- **The Talk panel says Not listening while the agent works.** Both
+  panels are grey between requests and the status reads "Not listening.
+  Wait for the agent, then speak." Nothing said then reaches the agent
+  (spec 042). The Listen panel stays grey until the agent
   talks.
 
 ## Why

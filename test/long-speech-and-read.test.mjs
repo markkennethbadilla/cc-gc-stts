@@ -64,52 +64,17 @@ test('a listen that reaches the bound continues, and the window is told to keep 
   assert.ok(page.got.some((m) => m.type === 'released'), 'the page must be told to keep the speech');
 });
 
-test('speech that lands with nothing pending is kept and comes back in order', async () => {
-  page.onRequest = () => {};
-  send({ type: 'complete', text: 'first part of a long thought' });
-  send({ type: 'complete', text: 'and the rest of it' });
-  await wait(50);
-  page.onRequest = (m) => { if (m.type === 'request') send({ type: 'complete', text: 'the new answer' }); };
-  const r = await post({ mode: 'stt', timeoutMs: 2000 });
-  assert.equal(r.body.text, 'first part of a long thought and the rest of it', 'spec 042: returned at once, before new speech');
-});
-
-test('a silent listen with buffered speech answers the speech, not the no-speech marker', async () => {
-  page.onRequest = () => {};
-  send({ type: 'barge', text: 'said while you worked' });
-  await wait(50);
-  page.onRequest = (m) => { if (m.type === 'request') send({ type: 'nospeech' }); };
-  assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, 'said while you worked');
-  assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, NO_SPEECH);
-});
-
-test('stress: 2000 utterances between tool calls all arrive, in order', async () => {
-  page.onRequest = () => {};
-  const words = Array.from({ length: 2000 }, (_, i) => `w${i}`);
-  words.forEach((w, i) => send({ type: i % 2 ? 'barge' : 'complete', text: w }));
-  await wait(300);
-  const got = await (await fetch(`http://127.0.0.1:${PORT}/barge`)).json();
-  assert.equal(got.text, words.join(' '));
-});
-
-// Spec 018. Words said between tool calls reach the voice-loop agent exactly once:
-// a background subagent's or another session's hook no longer takes them.
-test('only the voice owner takes speech said between calls, three rounds', async () => {
-  const barge = async (q) => (await (await fetch(`http://127.0.0.1:${PORT}/barge?${q}`)).json()).text;
+// Spec 042. Speech with no listen open is not kept; the next listen waits for new speech.
+test('speech said with no listen open is dropped; the next listen gets only new speech', async () => {
   for (let k = 0; k < 3; k++) {
-    assert.equal(await barge('who=main|&owner=1'), '');          // the loop agent's stt call claims the voice
-    send({ type: 'barge', text: `how do they sign in ${k}` });
-    await wait(50);
-    assert.equal(await barge('who=main|sub1'), '');               // its background subagent: nothing
-    assert.equal(await barge('who=other-session|'), '');          // another session: nothing
-    assert.equal(await barge('who=main|'), `how do they sign in ${k}`); // the loop agent: all of it
-    assert.equal(await barge('who=main|'), '');                   // once
-    send({ type: 'barge', text: `then this ${k}` });
-    await wait(50);
-    assert.equal(await barge('who=main|sub1'), '');
-    page.onRequest = (m) => { if (m.type === 'request') send({ type: 'nospeech' }); };
-    assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, `then this ${k}`); // or the next listen
     page.onRequest = () => {};
+    send({ type: 'complete', text: `said while busy ${k}` });
+    send({ type: 'barge', text: `old page chunk ${k}` });
+    await wait(50);
+    page.onRequest = (m) => { if (m.type === 'request') send({ type: 'complete', text: `the new answer ${k}` }); };
+    assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, `the new answer ${k}`);
+    page.onRequest = (m) => { if (m.type === 'request') send({ type: 'nospeech' }); };
+    assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, NO_SPEECH);
   }
 });
 

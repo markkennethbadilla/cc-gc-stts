@@ -44,19 +44,11 @@ Root causes, found in the code:
   gives up.
 - **A listen at the bound continues.** The daemon answers
   `__STTS_LISTEN_CONTINUES__` and sends the page `released`. The page moves the
-  box and any unfinished text into its carry, the same store it uses for speech
-  heard while idle. The next listen starts with the carry in the box. If no listen
-  comes, the carry goes to the daemon as a barge-in after his pause.
-- **Late speech is kept.** A `complete` that arrives with no listen pending goes
-  into the barge-in buffer instead of being dropped. The next listen returns it
-  first, and a listen that would answer "no speech" answers with the buffer
-  instead.
-- **Unfinished speech is saved before anything can discard it.** While idle, the
-  page remembers the latest interim text and moves it into carry on every
-  recognizer end, before every abort (the mute when the agent speaks, a restart),
-  and when a listen starts. A final that lands later is deduped against it.
-- **The microphone watchdog runs while idle too**, not only during a listen, so
-  speech between tool calls is heard. It still stays out of the agent's own turn.
+  box and any unfinished text into its carry, which holds only what
+  was said during that open listen. The next listen starts with the carry in the
+  box. Speech said with no listen open is not kept (spec 042).
+- **The microphone watchdog runs while idle too**, so the mic is ready the moment
+  a listen opens. It still stays out of the agent's own turn.
 - **A connected window is reused.** After a daemon restart the old window
   reconnects on its own, and the daemon no longer opens a second one.
 

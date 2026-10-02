@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { launchStt, launchTts, REQUEST_TIMEOUT_MS } from './daemon-client.ts';
-import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED, readsUnfinished } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED, BACKGROUND_RESULT, readsUnfinished } from './protocol.ts';
 import { loadText, toParts } from './read-aloud.ts';
 
 const ENDED_NOTE =
@@ -13,7 +13,9 @@ const ENDED_NOTE =
 const NO_SPEECH_NOTE =
   ` If the reply is exactly ${NO_SPEECH}, he has said nothing yet within idleSec: the window ` +
   'is still open and listening. If a background result has finished, relay it with tts (listen=true); ' +
-  'otherwise call stt again without speaking. It never means the conversation ended.';
+  'otherwise call stt again without speaking. It never means the conversation ended.' +
+  ` If the reply is exactly ${BACKGROUND_RESULT}, a background agent just finished: relay its result now with tts (listen=true). ` +
+  'Anything he was saying is kept for that listen.';
 
 // Spec 012.
 const CONTINUES_NOTE =

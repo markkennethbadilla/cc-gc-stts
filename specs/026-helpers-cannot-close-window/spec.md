@@ -18,8 +18,7 @@ one browser process.
 
 In `src/stts-daemon.ts`:
 
-- The house hook tells the daemon who is calling (`who = session|agent`,
-  spec 018). A main session has an empty agent part. `close` is honoured only
+- The house hook tells the daemon who is calling (`who = session|agent`). A main session has an empty agent part. `close` is honoured only
   when the caller is a main session, or when no hook has named anyone.
 - A daemon on any port other than 15986 uses the profile folder
   `profile-<port>` instead of `profile`.

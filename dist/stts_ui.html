@@ -1537,8 +1537,8 @@
        One separate script block that only reads the upstream page's top-level bindings, so upstream
        changes merge without touching this and this can be deleted if upstream ships the same.
        Adds: voice picker; one always-on microphone shared by both panels; auto-send after a pause
-       that also flushes interim (not yet final) speech, so a lone "yes" is sent; speech captured
-       while the agent is thinking or talking is carried into the next prompt; barge-in (talking over
+       that also flushes interim (not yet final) speech, so a lone "yes" is sent; speech said
+       while no listen is open is not kept (spec 042); barge-in (talking over
        the agent stops it) on an echo-cancelled mic track so the agent's own voice never reaches the recognizer (spec 037). -->
   <script>
     (function () {
@@ -2069,12 +2069,12 @@
              pause mid-sentence looked like the end of the turn and the prompt went early, cutting
              Mark off (2026-09-17, still at 4 s). The recognizer knows when speech itself starts
              and stops, so use that: no timer may run while he is audibly talking. */
-          this.addEventListener('speechstart', () => { speechStartedAt = Date.now(); micAlive(); clearTimeout(pauseTimer); clearTimeout(bargeTimer); });
-          this.addEventListener('speechend', () => { speechStartedAt = 0; micAlive(); armPause(); armBarge(); });
+          this.addEventListener('speechstart', () => { speechStartedAt = Date.now(); micAlive(); clearTimeout(pauseTimer); });
+          this.addEventListener('speechend', () => { speechStartedAt = 0; micAlive(); armPause(); });
           this.addEventListener('end', () => {
             ttsContainer.classList.remove('listening');
             micAlive();
-            if (this === mic) { micRunning = false; endedAt = Date.now(); playIdx = -1; saveIdleInterim(); }
+            if (this === mic) { micRunning = false; endedAt = Date.now(); playIdx = -1; }
             if (!this.__wanted || this.__fatal || this.__paused || stopOnSilence.checked) return;
             // A start() that threw used to be swallowed and never retried, leaving the mic dead
             // for the rest of the session. Retry with a widening delay, capped at 2 s.
@@ -2105,10 +2105,9 @@
       // activateStt is the one place a start is wanted; mic runs from then on.
       const origActivateStt = activateStt;
       activateStt = function (config) {
-        saveIdleInterim();   // spec 012: an idle utterance the browser has not finalised yet is kept, not wiped
         prov = null; pendingInterim = '';
         origActivateStt(config);
-        if (carry) { insert(carry); carry = ''; if (micSpeaking()) armPause(); else flushAndSend(); }   // spec 042: finished speech goes back at once
+        if (carry) { insert(carry); carry = ''; if (micSpeaking()) armPause(); else flushAndSend(); }   // spec 042: speech from a listen released at its limit
         armIdle(config.idleSec);
         heardAt = Date.now();   // spec 011: the quiet clock starts with the listen
       };
@@ -2143,7 +2142,6 @@
         });
         if (!why) return;
         micLog(`mic restart #${++restarts}: ${why}`);
-        saveIdleInterim();
         heardAt = endedAt = Date.now(); speechStartedAt = 0;
         mic.__paused = muted; mic.__fatal = false;   // a pause left by a lost speech 'end' is stale in a listen
         try { origAbort.call(mic); } catch { }
@@ -2154,7 +2152,7 @@
       /* Spec 010. A listen with no idle exit held the agent until Mark spoke or the request timed
          out, so it could not relay background results it had promised him (181 s, 2026-09-28).
          After idleSec with nothing typed or heard, answer __STTS_NO_SPEECH__ and go idle quietly:
-         the mic stays live, and anything he says next is a barge-in or the next prompt. */
+         the mic stays live, but nothing he says reaches the agent until the next listen (spec 042). */
       let idleTimer = null;
       function armIdle(sec) {
         clearTimeout(idleTimer);
@@ -2339,56 +2337,20 @@
           armPause();
           return;
         }
-        const text = finalText || interim;
-        if (currentMode === 'tts') {
-          /* Spec 016 (Mark 2026-09-30). Talking over the agent does not stop the voice: it
-             finishes. Spec 019: everything he says during the agent's turn (not its own voice)
-             is carried into the next prompt, or reaches the agent as a barge-in after his pause
-             once idle. Only the Stop button or the agent's next call stops the voice. */
-          if (finalText) {
-            idleInterim = '';
-            const kept = stripCommands(dedupe(finalText));
-            if (kept) carry = [carry, kept].filter(Boolean).join(' ');
-          } else if (interim) idleInterim = interim.trim();
-          return;
-        }
-        // idle: the agent is working. Keep finals, and after Mark's pause hand them to the
-        // daemon as a barge-in (spec 002), so the hook delivers them at the next tool call.
-        // If nothing fetches them, the daemon prepends them to the next stt answer.
-        if (finalText) {
-          clearInterim();
-          idleInterim = '';
-          const kept = stripCommands(dedupe(finalText));
-          if (kept) { carry = [carry, kept].filter(Boolean).join(' '); insert(kept); }
-        }
-        if (interim) { idleInterim = interim.trim(); showInterim(idleInterim); }
-        armBarge();
-      }
-      /* Spec 012. Speech between tool calls reached the agent as "Thank you." and nothing else
-         (2026-09-28): the browser held the long utterance before it as interim text, and the abort that
-         mutes the mic when the agent speaks (or a mic restart) drops interim audio for good. So
-         the latest idle interim is moved into carry before anything can discard it: on every
-         recognizer end, before every abort, and when a listen starts. A final that lands later
-         is deduped against it. */
-      let idleInterim = '';
-      function saveIdleInterim() {
-        if (!idleInterim) return;
-        const kept = stripCommands(idleInterim);
-        flushed = rawInterim || idleInterim; flushedAt = Date.now(); idleInterim = '';
-        if (kept) { carry = [carry, kept].filter(Boolean).join(' '); prov = null; armBarge(); }
+        /* Spec 042 (Mark 2026-10-03). Speech outside an open listen (the agent working or
+           speaking) is not kept for later: answered two turns late, it caused miscommunication.
+           The Talk panel shows Not listening, so he knows to say it again once it listens. */
       }
       /* Spec 012. A listen the daemon released at its time limit (the tool call has to return
-         before the gateway gives up) used to strand what Mark was saying: the page kept it, sent
-         it later to a daemon with nothing pending, and it was dropped. Now it becomes carry, the
-         same as speech heard while idle, so the next listen starts with it or, if none comes,
-         it reaches the agent as a barge-in after his pause. */
+         before the gateway gives up) keeps what Mark was saying during that open listen as carry,
+         and the next listen starts with it. */
       window.onSttsReleased = function () {
         if (currentMode !== 'stt') return;
         clearTimeout(pauseTimer); clearTimeout(idleTimer);
         flushInterim();
         const said = input.value.trim();
         resetToIdle();
-        if (said) { carry = [carry, said].filter(Boolean).join(' '); armBarge(); }
+        if (said) carry = [carry, said].filter(Boolean).join(' ');
       };
       /* Spec 013, 016. A press of the stop button ends the speaking turn and says so, so a long reading stops for good instead of going on to its next
          part, and a tts with listen goes straight to listening instead of waiting out the time limit. */
@@ -2398,34 +2360,17 @@
         resetToIdle();
       }
       stopBtn.onclick = () => { const live = currentMode === 'tts'; stopSpeaking(); if (live) interruptTts(); };
-      function armBarge() {
-        if (muted) return;   // paused: hold the countdown, resume rearms it
-        if (carry && !micSpeaking()) {
-          clearTimeout(bargeTimer);
-          bargeTimer = setTimeout(() => {
-            if (currentMode !== null || !carry) return;
-            sendSocket({ type: 'barge', text: carry });
-            carry = ''; prov = null; input.value = '';
-            sttStatus.textContent = 'Sent to the agent. Listening...';
-          }, quietMs(carry));
-        }
-      }
 
-      /* Spec 004: while the agent works (idle), the Talk panel looks live and transcribes,
-         because the mic is live. Upstream greys both panels; only the Listen panel stays grey. */
+      /* Spec 042: while the agent works or speaks, the Talk panel is greyed and says
+         Not listening, so Mark knows to wait. Nothing said then reaches the agent. */
       const origResetToIdle = resetToIdle;
       resetToIdle = function () {
         origResetToIdle();
-        armBarge();   // spec 019: speech kept during the agent's turn goes out after his pause
-        sttPanel.classList.remove('inactive');
-        sttLabel.classList.add('active');
-        dictateBtn.style.opacity = '1'; dictateBtn.style.pointerEvents = 'auto';
-        commandsBtn.style.opacity = '1'; commandsBtn.style.pointerEvents = 'auto';
-        sttStatus.textContent = 'Agent working. Listening...';
+        input.value = ''; prov = null; pendingInterim = '';
+        sttStatus.textContent = 'Not listening. Wait for the agent, then speak.';
         sttStatus.classList.add('visible');
-        input.placeholder = 'Say something; it reaches the agent after your pause';
+        input.placeholder = 'Not listening. Wait until this says Listening.';
       };
-      let bargeTimer = null;
 
 
       /* Spec 003/006: Space pauses and resumes the mic anywhere in the window, one press
@@ -2460,7 +2405,7 @@
         sttStatus.classList.toggle('muted', on);
         pauseBtn.classList.toggle('paused', on);
         pauseBtn.title = on ? 'Resume listening (Space)' : 'Pause listening and hold auto-send (Space)';
-        if (on) { clearTimeout(pauseTimer); clearTimeout(bargeTimer); }
+        if (on) clearTimeout(pauseTimer);
         if (!mic) return;
         if (on) { mic.__paused = true; try { origAbort.call(mic); } catch { } }
         else { mic.__paused = false; try { startMic(mic); } catch { } }
