@@ -27,7 +27,7 @@ test('no text echo filter is left', () => {
   for (const f of ['stripEcho', 'stripTail', 'isSpokenBack', 'ownVoice', 'bargeIn']) assert.ok(!html.includes(f), f);
 });
 test('fallback: results are discarded while the voice plays and by index after, never by text', () => {
-  assert.match(html, /if \(synth\.speaking\) \{ playIdx = event\.results\.length - 1; return; \}/);
+  assert.match(html, /if \(synth\.speaking \|\| globalThis\.__earcon\) \{ playIdx = event\.results\.length - 1; return; \}/);
   assert.match(html, /for \(let i = Math\.max\(event\.resultIndex, playIdx \+ 1\);/);
   assert.match(html, /endedAt = Date\.now\(\); playIdx = -1;/);
 });

@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 const outdir = 'dist';
@@ -23,5 +23,6 @@ await build({
 });
 
 copyFileSync(path.join('src', 'stts_ui.html'), path.join(outdir, 'stts_ui.html'));
+cpSync(path.join('src', 'earcons'), path.join(outdir, 'earcons'), { recursive: true });   // spec 045
 
 console.log('Build complete: dist/stts.mjs, dist/stts-mcp-server.mjs, dist/stts-daemon.mjs');

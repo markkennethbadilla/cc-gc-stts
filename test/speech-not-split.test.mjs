@@ -63,7 +63,7 @@ test('an unfinished ending waits the hold; a finished one the pause; page and se
       assert.equal(quietMs(t), 100, t);
     }
   }
-  assert.match(html, /pauseTimer = setTimeout\(flushAndSend, quietMs\(/);
+  assert.match(html, /const ms = quietMs\([\s\S]{0,200}pauseTimer = setTimeout\(flushAndSend, ms\)/);
 });
 
 test('a recognizer that ends restarts at once; only rapid repeat failures back off, capped at 2 s', () => {

@@ -37,8 +37,19 @@ test('the hook ends an open listen with the marker and the page keeps his words'
     assert.equal(hook().status, 0);
     assert.equal((await (await listen).json()).text, BACKGROUND_RESULT);
     assert.ok(Date.now() - t < 3000, 'returned at once');
-    assert.ok(got.some((m) => m.type === 'released'), 'page told to keep half-said words');
+    assert.ok(got.some((m) => m.type === 'released' && m.reason === 'background'), 'page told to keep half-said words and play the two-tone (spec 045)');
   }
+});
+
+test('spec 045: the daemon serves the earcons, and nothing else under /earcon', async () => {
+  for (const n of ['listen-open', 'turn-captured', 'background-result']) {
+    const r = await fetch(`${base}/earcon/${n}.ogg`);
+    assert.equal(r.status, 200, n);
+    assert.equal(r.headers.get('content-type'), 'audio/ogg');
+    assert.ok((await r.arrayBuffer()).byteLength > 1000);
+  }
+  assert.equal((await fetch(`${base}/earcon/SOURCE.txt`)).status, 404);
+  assert.equal((await fetch(`${base}/earcon/..%2Fstts-daemon.ts`)).status, 404);
 });
 
 test('no listen open, or a tts playing: notify changes nothing', async () => {

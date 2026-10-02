@@ -68,7 +68,11 @@ const TURN_NOTE =
   'your next call must be tts with listen=true answering turn N; an stt before you answer is refused. If turn N needs no spoken answer ' +
   '(not meant for you, or your answer would only repeat your last reply), call stt with ack=N instead. Do not ask him to finish a sentence: ' +
   'the window already joins a sentence cut mid-thought before returning it, never returns the same speech twice, and drops speech said ' +
-  'while you were working or speaking, so what you get is current and complete.';
+  'while you were working or speaking, so what you get is current and complete. ' +
+  // Spec 045
+  'Mark hears a chime when the listen opens (the listen only opens after it, so a reply always comes after the chime and you never speak over it), ' +
+  'a tick when his turn is captured, and a two-tone when a background result ends a listen; the window shows the same as a coloured banner. ' +
+  'Do not announce "listening" or "got it" yourself.';
 
 const reply = (...texts: string[]) => ({ content: texts.map((text) => ({ type: 'text' as const, text })) });
 

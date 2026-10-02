@@ -1510,7 +1510,7 @@
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
         // Spec 012. The daemon released a listen at its time limit; the fork script keeps what was heard.
-        if (msg.type === 'released') { if (window.onSttsReleased) window.onSttsReleased(); return; }
+        if (msg.type === 'released') { if (window.onSttsReleased) window.onSttsReleased(msg); return; }
         if (msg.type !== 'request' || !msg.config) return;
         if (currentMode !== null) resetToIdle();
         if (msg.config.mode === 'stt') activateStt(msg.config);
@@ -2117,6 +2117,93 @@
         heardAt = Date.now();   // spec 011: the quiet clock starts with the listen
       };
 
+      /* Spec 045 (Mark 2026-10-03): "markers so I know when to speak, when not to, and what's being
+         processed." One banner, one state, one earcon per state change. The listen-open chime plays
+         BEFORE the listen opens, and results during any earcon are dropped (onResult), so a chime is
+         never transcribed. Earcons: Kenney Interface Sounds, CC0 (src/earcons/SOURCE.txt). */
+      const LS_EARCONS = '__stts__earcons', LS_EARCON_VOL = '__stts__earcon_vol', LS_GOTIT = '__stts__gotit';
+      const EARCON = { speak: 'listen-open', heard: 'turn-captured', background: 'background-result' };
+      const BANNER = {
+        speak: ['\u{1F7E2}', 'Speak now'],
+        heard: ['\u23F3', 'Heard: "%s" - working'],
+        background: ['\u{1F514}', 'Background result arrived - agent working'],
+        agent: ['\u{1F50A}', 'Agent speaking - wait'],
+        idle: ['\u23F8', 'Not listening'],
+      };
+      document.head.appendChild(Object.assign(document.createElement('style'), {
+        textContent: '#turn-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;font:700 20px/1.25 var(--font-stack);position:relative;transition:background .2s}' +
+          '#turn-banner .tb-icon{font-size:26px}#turn-banner .tb-text{flex:1;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}' +
+          '#turn-banner[data-state=speak]{background:#188038;color:#fff}#turn-banner[data-state=heard],#turn-banner[data-state=background]{background:#f9ab00;color:#202124}' +
+          '#turn-banner[data-state=agent]{background:#1967d2;color:#fff}#turn-banner[data-state=idle]{background:#5f6368;color:#fff}' +
+          '#turn-banner .tb-bar{position:absolute;left:0;bottom:0;height:6px;width:0;background:rgba(255,255,255,.85)}' +
+          '#turn-banner .tb-bar.pulse{width:100%;animation:tbpulse .8s ease-in-out infinite alternate}@keyframes tbpulse{from{opacity:.35}to{opacity:1}}' +
+          '@media (prefers-reduced-motion:reduce){#turn-banner .tb-bar.pulse{animation:none}}'
+      }));
+      const banner = document.createElement('div');
+      banner.id = 'turn-banner'; banner.setAttribute('role', 'status'); banner.setAttribute('aria-live', 'assertive');
+      banner.innerHTML = '<span class="tb-icon" aria-hidden="true"></span><span class="tb-text"></span><span class="tb-bar"></span>';
+      document.body.prepend(banner);
+      const tbBar = banner.querySelector('.tb-bar');
+      // ms > 0: drain over ms (the pause window); -1: still talking, full and pulsing; 0: hidden.
+      globalThis.__countdown = function (ms) {
+        tbBar.classList.toggle('pulse', ms < 0);
+        tbBar.style.transition = 'none'; tbBar.style.width = ms > 0 ? '100%' : '';
+        if (ms > 0) { void tbBar.offsetWidth; tbBar.style.transition = 'width ' + ms + 'ms linear'; tbBar.style.width = '0%'; }
+      };
+      const marks = checkbox(sttContainer, 'Markers', 'earcons-on',
+        'chimes at volume <input type="range" id="earcon-vol" min="0.05" max="1" step="0.05" style="width:6em">' +
+        ' <input type="checkbox" id="gotit-on" style="margin:0 0 0 8px"> say "Got it"', LS_EARCONS, true);
+      const earconVolEl = marks.bar.querySelector('#earcon-vol'), gotitEl = marks.bar.querySelector('#gotit-on');
+      earconVolEl.value = localStorage.getItem(LS_EARCON_VOL) || '0.5';
+      earconVolEl.oninput = () => localStorage.setItem(LS_EARCON_VOL, earconVolEl.value);
+      gotitEl.checked = localStorage.getItem(LS_GOTIT) === '1';
+      gotitEl.onchange = () => localStorage.setItem(LS_GOTIT, gotitEl.checked ? '1' : '0');
+      const earconBufs = {};
+      function playEarcon(name) {
+        if (!marks.box.checked) return Promise.resolve();
+        globalThis.__earcon = true;
+        earconBufs[name] ||= fetch('/earcon/' + name + '.ogg').then(r => r.arrayBuffer()).then(a => audio.decodeAudioData(a));
+        return earconBufs[name].then(buf => new Promise(done => {
+          if (audio.state !== 'running') audio.resume();
+          const s = audio.createBufferSource(), g = audio.createGain();
+          g.gain.value = Number(earconVolEl.value);
+          s.buffer = buf; s.connect(g).connect(audio.destination);
+          const dog = setTimeout(done, buf.duration * 1000 + 1000);   // a suspended context never fires onended
+          s.onended = () => { clearTimeout(dog); done(); };
+          s.start();
+        })).catch(() => { }).then(() => new Promise(r => setTimeout(r, 120)))   // room tail, so the mic does not catch it
+          .finally(() => { globalThis.__earcon = false; });
+      }
+      let turnState = '';
+      function setTurnState(state, words) {
+        const changed = state !== turnState;
+        turnState = state;
+        const [icon, text] = BANNER[state];
+        const paint = () => {
+          if (turnState !== state) return;
+          banner.dataset.state = state;
+          banner.querySelector('.tb-icon').textContent = icon;
+          banner.querySelector('.tb-text').textContent = state === 'heard' ? text.replace('%s', String(words || '').slice(0, 160)) : (words || text);
+        };
+        if (state !== 'speak') paint();   // green only once the chime is done: speaking early is not lost
+        if (!changed || !EARCON[state]) { paint(); return Promise.resolve(); }
+        globalThis.__markers?.push(state);   // test hook
+        return playEarcon(EARCON[state]).then(() => {
+          paint();
+          if (state === 'heard' && gotitEl.checked) speechSynthesis.speak(new SpeechSynthesisUtterance('Got it'));
+        });
+      }
+      globalThis.setTurnState = setTurnState;
+      setTurnState('idle');
+      let openSeq = 0;
+      const activateNow = activateStt;
+      activateStt = function (config) {
+        const my = ++openSeq, at = Date.now();
+        setTurnState('speak').then(() => { if (my === openSeq && socket && !(globalThis.__releasedAt >= at)) activateNow(config); });
+      };
+      const markTts = activateTts;
+      activateTts = function (config) { openSeq++; setTurnState('agent'); return markTts(config); };
+
       /* Spec 011. A listen whose recognizer has quietly died: the mic icon said listening, Mark
          talked, nothing was written, and the request ran to its 240 s timeout (2026-09-28, five
          times). Only a new window fixed it. the browser's recognizer can stop with no error and no
@@ -2170,7 +2257,7 @@
         };
         idleTimer = setTimeout(fire, sec * 1000);
       }
-      const origActivateTts = activateTts;
+      const ttsNow = activateTts;
       activateTts = function (config) {
         // The thumb moves too, so the slider always shows the rate actually used.
         if (applyLive(config).rate !== null) { rateRange.value = live.rate; rateVal.textContent = live.rate.toFixed(1) + 'x (this window)'; }
@@ -2297,9 +2384,11 @@
       function armPause() {
         clearTimeout(pauseTimer);
         if (muted) return;   // paused: hold the countdown, resume rearms it
-        if (micSpeaking()) { pauseTimer = setTimeout(armPause, 400); return; }   // still talking
+        if (micSpeaking()) { globalThis.__countdown?.(-1); pauseTimer = setTimeout(armPause, 400); return; }   // still talking
         if (currentMode === 'stt' && autoOn.checked && (input.value.trim() || pendingInterim)) {
-          pauseTimer = setTimeout(flushAndSend, quietMs(`${input.value} ${pendingInterim || ''}`));
+          const ms = quietMs(`${input.value} ${pendingInterim || ''}`);
+          globalThis.__countdown?.(ms);   // spec 045: the bar drains until the turn closes
+          pauseTimer = setTimeout(flushAndSend, ms);
         }
       }
       /* Spec 012. Upstream submit and cancel stop dictation (`if (isRecording) toggleDictation()`),
@@ -2323,7 +2412,7 @@
       let playIdx = -1;
       function onResult(event) {
         let finalText = '', interim = '';
-        if (synth.speaking) { playIdx = event.results.length - 1; return; }
+        if (synth.speaking || globalThis.__earcon) { playIdx = event.results.length - 1; return; }   // spec 037, 045
         for (let i = Math.max(event.resultIndex, playIdx + 1); i < event.results.length; ++i) {
           const t = event.results[i][0].transcript;
           if (event.results[i].isFinal) finalText += t; else interim += t;
@@ -2350,19 +2439,22 @@
            The Talk panel shows Not listening, so he knows to say it again once it listens. */
         if (finalText.trim()) {   // spec 044: say plainly that it was dropped
           sttStatus.textContent = 'Not heard (agent not listening): "' + finalText.trim().slice(0, 80) + '". Say it again when this says Listening.';
+          globalThis.setTurnState?.('idle', 'Not heard: "' + finalText.trim().slice(0, 80) + '". Say it again when this turns green.');   // spec 045
           sttStatus.classList.add('visible');
         }
       }
       /* Spec 012. A listen the daemon released at its time limit (the tool call has to return
          before the gateway gives up) keeps what Mark was saying during that open listen as carry,
          and the next listen starts with it. */
-      window.onSttsReleased = function () {
+      window.onSttsReleased = function (msg) {
+        globalThis.__releasedAt = Date.now();   // spec 045: a listen still waiting on its chime must not open
         if (currentMode !== 'stt') return;
         clearTimeout(pauseTimer); clearTimeout(idleTimer);
         flushInterim();
         const said = input.value.trim();
         resetToIdle();
         if (said) carry = [carry, said].filter(Boolean).join(' ');
+        if (msg && msg.reason === 'background') setTurnState('background');   // spec 045
       };
       /* Spec 013, 016. A press of the stop button ends the speaking turn and says so, so a long reading stops for good instead of going on to its next
          part, and a tts with listen goes straight to listening instead of waiting out the time limit. */
@@ -2383,6 +2475,8 @@
         sttStatus.textContent = globalThis.__heard
           ? 'Heard, agent working on: "' + globalThis.__heard.slice(0, 120) + '". Not listening until it answers.'
           : 'Not listening. Wait for the agent, then speak.';
+        setTurnState(globalThis.__heard ? 'heard' : 'idle', globalThis.__heard);   // spec 045
+        globalThis.__countdown?.(0);
         globalThis.__heard = '';
         sttStatus.classList.add('visible');
         input.placeholder = 'Not listening. Wait until this says Listening.';

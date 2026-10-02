@@ -273,6 +273,16 @@ const server = http.createServer(async (req, res) => {
 
   if (await handleVoice(req, res, url)) return;   // spec 038
 
+  // Spec 045: the turn-marker earcons (src/earcons, copied to dist/earcons by build.mjs).
+  const earcon = req.method === 'GET' && /^\/earcon\/([a-z-]+\.ogg)$/.exec(url.pathname);
+  if (earcon) {
+    const file = path.resolve(__dirname, 'earcons', earcon[1]);
+    if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'audio/ogg', 'Cache-Control': 'max-age=86400' });
+    res.end(fs.readFileSync(file));
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/ping') {
     res.writeHead(200, { 'X-Stts-Dir': __dirname });   // spec 041
     res.end('ok');
@@ -299,7 +309,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/notify') {
     const listening = pending?.config.mode === 'stt';
     if (listening) {
-      if (pageSocket?.readyState === WebSocket.OPEN) pageSocket.send(JSON.stringify({ type: 'released' }));
+      if (pageSocket?.readyState === WebSocket.OPEN) pageSocket.send(JSON.stringify({ type: 'released', reason: 'background' }));   // spec 045: two-tone
       resolvePending(heldOr(BACKGROUND_RESULT));
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });

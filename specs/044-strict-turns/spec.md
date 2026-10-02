@@ -23,11 +23,9 @@ Nothing he said earlier turns up later, and nothing is delivered twice.
   answer, call stt with ack=N." Any `tts` answers the turn. `stt` with `ack=N`
   is the way to stay silent on purpose. A no-speech, time-limit or background
   result return is not a turn and needs no answer.
-- The window says which state it is in: "Listening", then "Heard, agent working
-  on: ..." once a turn is sent, then "Agent speaking. Not listening yet." while
-  it answers. Words said while it is not listening are dropped (spec 042), and
-  the status says so: "Not heard (agent not listening): ... Say it again when
-  this says Listening."
+- The window and speakers mark each state (spec 045: banner and earcons).
+  Words said while it is not listening are dropped (spec 042), and the window
+  says so.
 
 ## Why it exists
 
