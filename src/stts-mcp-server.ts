@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { launchStt, launchTts, REQUEST_TIMEOUT_MS } from './daemon-client.ts';
-import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED, BACKGROUND_RESULT, readsUnfinished } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, DEFAULT_IDLE_SEC, LISTEN_CONTINUES, STOPPED, BACKGROUND_RESULT } from './protocol.ts';
 import { loadText, toParts } from './read-aloud.ts';
 
 const ENDED_NOTE =
@@ -40,7 +40,7 @@ const idleSec = z
     `Seconds to wait for speech before returning ${NO_SPEECH} (default ${DEFAULT_IDLE_SEC}, 0 waits until he speaks).`
   );
 
-const listenFor = (idle: number | undefined, timeoutMs: number) =>
+const listenFor = (idle: number | undefined, timeoutMs: number, ack?: number) =>
   timeoutMs < MIN_LISTEN_MS
     ? Promise.resolve(LISTEN_CONTINUES)
     : launchStt({
@@ -50,6 +50,7 @@ const listenFor = (idle: number | undefined, timeoutMs: number) =>
         startRecording: false,
         idleSec: idle ?? DEFAULT_IDLE_SEC,
         timeoutMs,
+        ack,
       });
 
 // Spec 015. Waiting for him is itself a listen: a sleep or any other blocking
@@ -58,20 +59,16 @@ const NO_SLEEP_NOTE =
   ' Never sleep or block on another tool to wait for him: to wait, call stt again (the default ' +
   `idleSec, ${DEFAULT_IDLE_SEC}, is already the longest), so you answer the moment he stops talking. ` +
   'Use the default idleSec for every normal wait: a background result arrives on its own and interrupts the listen. ' +
-  'The one exception (spec 023): a listen made only because a turn reads unfinished passes idleSec 1. ' +
   // Spec 026.
   'A message he types into the chat mid-loop (usually something too long to say) is a turn, not an exit: handle it, answer by voice, and go straight back to listening. Typing never ends the conversation.';
-// Spec 019: a turn is sent after 0.7 s of quiet (1 s when it trails off), and the agent
-// judges whether the thought is finished; when unsure, it listens again rather than answer.
-const midThought = (again: string) =>
-  ' A turn can arrive mid-thought. If the transcript reads unfinished (trails off, ends on a connector ' +
-  `like 'and', 'so', 'but', 'because', 'like', 'um', a half sentence, or a dangling clause), do not answer; ${again} with idleSec 1 and join the pieces. ` +
-  `If that short listen returns ${NO_SPEECH}, he has finished: answer what you have. Answer only when the thought is complete enough. If a transcript repeats something you already answered, it is the same speech delivered late: do not answer it again; listen again silently. If your answer would only repeat what you said in your last reply (he confirms something you already confirmed), do not speak at all: listen again silently.`;
-// Spec 019: the returned text says so too, when its last word reads unfinished.
-const UNFINISHED_NOTE =
-  `This reads unfinished (it ends mid-thought). Unless it is clearly complete, do not answer: listen again with idleSec 1 and join the pieces; if that returns ${NO_SPEECH}, answer what you have.`;
-const heardReply = (heard: string, ...more: string[]) =>
-  reply(heard, ...(readsUnfinished(heard) && !heard.startsWith('__STTS_') ? [UNFINISHED_NOTE] : []), ...more);
+// Spec 044: strict turns. The daemon numbers turns, joins a cut sentence, drops
+// repeats and stale speech, and refuses a listen while a returned turn is unanswered.
+const TURN_NOTE =
+  ' Every heard turn starts with [turn N, heard HH:MM:SS to HH:MM:SS]. The protocol is listen, answer that exact turn at once, listen: ' +
+  'your next call must be tts with listen=true answering turn N; an stt before you answer is refused. If turn N needs no spoken answer ' +
+  '(not meant for you, or your answer would only repeat your last reply), call stt with ack=N instead. Do not ask him to finish a sentence: ' +
+  'the window already joins a sentence cut mid-thought before returning it, never returns the same speech twice, and drops speech said ' +
+  'while you were working or speaking, so what you get is current and complete.';
 
 const reply = (...texts: string[]) => ({ content: texts.map((text) => ({ type: 'text' as const, text })) });
 
@@ -86,10 +83,13 @@ server.registerTool(
       NO_SPEECH_NOTE +
       CONTINUES_NOTE +
       NO_SLEEP_NOTE +
-      midThought('call stt again'),
-    inputSchema: { idleSec },
+      TURN_NOTE,
+    inputSchema: {
+      idleSec,
+      ack: z.number().int().optional().describe('Turn id you are deliberately not answering aloud (spec 044). Without it, an stt right after a returned turn is refused.'),
+    },
   },
-  async ({ idleSec }) => heardReply(await listenFor(idleSec, CALL_BUDGET_MS))
+  async ({ idleSec, ack }) => reply(await listenFor(idleSec, CALL_BUDGET_MS, ack))
 );
 
 server.registerTool(
@@ -110,7 +110,7 @@ server.registerTool(
       NO_SPEECH_NOTE +
       CONTINUES_NOTE +
       NO_SLEEP_NOTE +
-      midThought('listen again (stt)'),
+      TURN_NOTE,
     inputSchema: {
       text: z.string().optional().describe('The text to speak. Give exactly one of text, file or url.'),
       file: z.string().optional().describe('Local path of a text or markdown file to read aloud, instead of text.'),
@@ -167,7 +167,7 @@ server.registerTool(
 
     if (!listen) return reply(note || 'Spoken.');
     const heard = await listenFor(idleSec, left());
-    return note ? heardReply(heard, note) : heardReply(heard);
+    return note ? reply(heard, note) : reply(heard);
   }
 );
 

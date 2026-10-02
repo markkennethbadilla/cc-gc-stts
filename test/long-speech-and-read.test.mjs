@@ -72,9 +72,11 @@ test('speech said with no listen open is dropped; the next listen gets only new 
     send({ type: 'barge', text: `old page chunk ${k}` });
     await wait(50);
     page.onRequest = (m) => { if (m.type === 'request') send({ type: 'complete', text: `the new answer ${k}` }); };
-    assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, `the new answer ${k}`);
+    const got = (await post({ mode: 'stt', timeoutMs: 2000 })).body.text;
+    assert.match(got, new RegExp(`\] the new answer ${k}$`));
+    const ack = Number(/turn (\d+)/.exec(got)[1]);
     page.onRequest = (m) => { if (m.type === 'request') send({ type: 'nospeech' }); };
-    assert.equal((await post({ mode: 'stt', timeoutMs: 2000 })).body.text, NO_SPEECH);
+    assert.equal((await post({ mode: 'stt', ack, timeoutMs: 2000 })).body.text, NO_SPEECH);
   }
 });
 
@@ -129,7 +131,7 @@ function speakingPage(ms, stopAt) {
   const spoken = [];
   page.onRequest = (m) => {
     if (m.type !== 'request') return;
-    if (m.config.mode === 'stt') { setTimeout(() => send({ type: 'complete', text: 'my reply' }), 20); return; }
+    if (m.config.mode === 'stt') { setTimeout(() => send({ type: 'complete', text: 'my reply ' + Math.random() }), 20); return; }
     spoken.push(m.config.text);
     setTimeout(() => send({ type: spoken.length === stopAt ? 'stopped' : 'close' }), ms);
   };
@@ -145,7 +147,7 @@ test('tts file: read to the end, then listen', async () => {
   const spoken = speakingPage(10);
   const f = bookFile();
   const out = await call({ file: f, listen: true });
-  assert.equal(out[0], 'my reply');
+  assert.match(out[0], /] my reply/);
   assert.match(out[1], /Read to the end \(part (\d+) of \1\)/);
   assert.equal(spoken.join(' ').replace(/\s+/g, ''), (await loadText(f)).replace(/\s+/g, ''));
 });
@@ -154,7 +156,7 @@ test('tts file: stop it ends the reading and says where to resume', async () => 
   const spoken = speakingPage(10, 2);
   const out = await call({ file: bookFile(), listen: true });
   assert.equal(spoken.length, 2);
-  assert.equal(out[0], 'my reply');
+  assert.match(out[0], /] my reply/);
   assert.match(out[1], /stopped it during part 2 of \d+.*part=2/);
 });
 

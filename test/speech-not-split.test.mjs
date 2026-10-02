@@ -76,18 +76,14 @@ test('a recognizer that ends restarts at once; only rapid repeat failures back o
 });
 
 
-test('stt and tts tell the agent to listen again when a turn reads unfinished', () => {
+test('spec 044: every agent text states the turn protocol and none asks for a short unfinished-turn listen', () => {
   const server = readFileSync(new URL('../src/stts-mcp-server.ts', import.meta.url), 'utf8');
-  assert.match(server, /A turn can arrive mid-thought\. If the transcript reads unfinished/);
-  assert.match(server, /NO_SLEEP_NOTE \+\s*midThought\('call stt again'\)/);
-  assert.match(server, /NO_SLEEP_NOTE \+\s*midThought\('listen again \(stt\)'\)/);
-  assert.match(server, /listen again with idleSec 1 and join the pieces; if that returns \$\{NO_SPEECH\}, answer what you have/);
-  assert.match(server, /The one exception \(spec 023\): a listen made only because a turn reads unfinished passes idleSec 1/);
-  for (const f of ['../skills/stts/SKILL.md', '../commands/stts.md', '../commands/stts.toml'])
-    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /do not answer; listen again with idleSec 1 and join the pieces\. If that short listen returns __STTS_NO_SPEECH__, he has finished: answer what you have/, f);
-});
-
-test('a reply that would only repeat the last one is not spoken (Mark 2026-09-30)', () => {
-  for (const f of ['../src/stts-mcp-server.ts', '../commands/stts.md', '../commands/stts.toml'])
-    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /If your answer would only repeat what you said in your last reply .*do not speak at all: listen again silently\./, f);
+  assert.match(server, /NO_SLEEP_NOTE \+\s*TURN_NOTE/);
+  for (const f of ['../src/stts-mcp-server.ts', '../skills/stts/SKILL.md', '../commands/stts.md', '../commands/stts.toml']) {
+    const t = readFileSync(new URL(f, import.meta.url), 'utf8');
+    assert.match(t, /turn N/, f);
+    assert.match(t, /ack=N/, f);
+    assert.match(t, /would only repeat your last reply/, f);   // Mark 2026-09-30: do not repeat yourself
+    assert.doesNotMatch(t, /idleSec 1/, f);
+  }
 });

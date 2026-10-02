@@ -88,7 +88,7 @@ test('the daemon answers nospeech with the marker, for stt only', () => {
   assert.ok(at > -1, "the daemon does not handle 'nospeech'");
   const branch = daemon.slice(at, daemon.indexOf('return;', at));
   assert.match(branch, /mode === 'stt'/);
-  assert.match(branch, /resolvePending\(NO_SPEECH\)/);   // spec 042: nothing is buffered
+  assert.match(branch, /resolvePending\(heldOr\(NO_SPEECH\)\)/);   // spec 042: nothing is buffered; spec 044: a held cut turn returns
 });
 
 test('the marker is ASCII, unmistakable, and not the end marker', () => {

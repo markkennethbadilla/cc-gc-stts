@@ -35,7 +35,7 @@ test('a held tts (caller gone quiet) is superseded; the new listen answers', asy
   onRequest = (m) => { if (m.type === 'request' && m.config.mode === 'stt') ws.send(JSON.stringify({ type: 'complete', text: 'hello' })); };
   const r = await fetch(url, { method: 'POST', body: JSON.stringify({ mode: 'stt', timeoutMs: 5000 }) });
   assert.equal(r.status, 200, 'the new call must not be refused busy');
-  assert.equal((await r.json()).text, 'hello');
+  assert.match((await r.json()).text, /] hello$/);
   const old = await stuck;
   assert.equal(old.status, 504);
   assert.match((await old.json()).error, /superseded/);
@@ -44,7 +44,7 @@ test('a held tts (caller gone quiet) is superseded; the new listen answers', asy
 test('a superseded listen tells the window to keep what it heard', async () => {
   got.length = 0;
   onRequest = () => {};
-  const stuck = fetch(url, { method: 'POST', body: JSON.stringify({ mode: 'stt', timeoutMs: 30000 }) });
+  const stuck = fetch(url, { method: 'POST', body: JSON.stringify({ mode: 'stt', ack: 1, timeoutMs: 30000 }) });
   await wait(200);
   onRequest = (m) => { if (m.type === 'request' && m.config.mode === 'tts') ws.send(JSON.stringify({ type: 'close' })); };
   const r = await fetch(url, { method: 'POST', body: JSON.stringify({ mode: 'tts', text: 'y', oneshot: true, timeoutMs: 5000 }) });

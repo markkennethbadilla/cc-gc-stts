@@ -948,7 +948,10 @@
       addToHistory(HIST_PROMPTS, text);
       promptHistory.refresh();
       promptHistory.resetNav();
-      sendSocket({ type: 'complete', text });
+      // Spec 044: capture times let the daemon order turns and drop stale ones.
+      sendSocket({ type: 'complete', text, startAt: globalThis.__turnStartAt || Date.now(), endAt: Date.now() });
+      globalThis.__turnStartAt = 0;
+      globalThis.__heard = text;
       resetToIdle();
     }
 
@@ -2106,7 +2109,9 @@
       const origActivateStt = activateStt;
       activateStt = function (config) {
         prov = null; pendingInterim = '';
+        globalThis.__turnStartAt = carry ? Date.now() : 0;   // spec 044 (carry: his words from a released listen)
         origActivateStt(config);
+        sttStatus.textContent = 'Listening';   // spec 044
         if (carry) { insert(carry); carry = ''; if (micSpeaking()) armPause(); else flushAndSend(); }   // spec 042: speech from a listen released at its limit
         armIdle(config.idleSec);
         heardAt = Date.now();   // spec 011: the quiet clock starts with the listen
@@ -2170,6 +2175,8 @@
         // The thumb moves too, so the slider always shows the rate actually used.
         if (applyLive(config).rate !== null) { rateRange.value = live.rate; rateVal.textContent = live.rate.toFixed(1) + 'x (this window)'; }
         const r = withSuppressed(origActivateTts)(config);
+        sttStatus.textContent = 'Agent speaking. Not listening yet.';   // spec 044
+        sttStatus.classList.add('visible');
         if (!isRecording) { try { origToggle(); } catch { } }
         return r;
       };
@@ -2324,6 +2331,7 @@
         rawInterim = interim.trim();
         if (interim) interim = dedupe(interim, true);
         if (currentMode === 'stt') {
+          if ((finalText || interim) && !globalThis.__turnStartAt) globalThis.__turnStartAt = Date.now();   // spec 044
           if (finalText) {
             clearInterim();
             const text = dedupe(finalText);
@@ -2340,6 +2348,10 @@
         /* Spec 042 (Mark 2026-10-03). Speech outside an open listen (the agent working or
            speaking) is not kept for later: answered two turns late, it caused miscommunication.
            The Talk panel shows Not listening, so he knows to say it again once it listens. */
+        if (finalText.trim()) {   // spec 044: say plainly that it was dropped
+          sttStatus.textContent = 'Not heard (agent not listening): "' + finalText.trim().slice(0, 80) + '". Say it again when this says Listening.';
+          sttStatus.classList.add('visible');
+        }
       }
       /* Spec 012. A listen the daemon released at its time limit (the tool call has to return
          before the gateway gives up) keeps what Mark was saying during that open listen as carry,
@@ -2367,7 +2379,11 @@
       resetToIdle = function () {
         origResetToIdle();
         input.value = ''; prov = null; pendingInterim = '';
-        sttStatus.textContent = 'Not listening. Wait for the agent, then speak.';
+        // Spec 044: the state machine in plain words. Heard -> agent working on it.
+        sttStatus.textContent = globalThis.__heard
+          ? 'Heard, agent working on: "' + globalThis.__heard.slice(0, 120) + '". Not listening until it answers.'
+          : 'Not listening. Wait for the agent, then speak.';
+        globalThis.__heard = '';
         sttStatus.classList.add('visible');
         input.placeholder = 'Not listening. Wait until this says Listening.';
       };

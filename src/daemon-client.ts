@@ -28,6 +28,7 @@ export const REQUEST_TIMEOUT_MS = Number(process.env.STTS_REQUEST_TIMEOUT_MS) ||
 export const CLIENT_MARGIN_MS = 5_000;
 
 export interface SttConfig {
+  ack?: number;   // spec 044
   title: string;
   action: string;
   initialText: string;

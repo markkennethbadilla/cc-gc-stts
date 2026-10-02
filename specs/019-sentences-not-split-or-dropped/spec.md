@@ -7,11 +7,8 @@
   unfinished (its last word is "and", "so", "but", "because", "um", "the",
   "to", a lead-in like "so I was thinking"), the window waits the longer hold,
   1 second, before sending. Both are settings in the window.
-- The agent still judges whether the thought is finished: a turn that reads
-  unfinished gets no answer; the agent listens again and joins the pieces. When
-  the returned transcript ends on such a word, the tool result says so too.
-  When in doubt, the agent listens again: Mark would rather wait a moment than
-  be cut off.
+- A turn that still reads unfinished after the hold is joined with what follows
+  by the daemon before it is returned (spec 044).
 - When the speech recognizer stops (Edge ends it with a `network` error about
   once a minute), it starts again at once instead of waiting up to 5 seconds
   with the microphone deaf.
@@ -51,12 +48,8 @@ Three causes, all in the page:
   pronouns, lead-ins); the same list is in `src/protocol.ts` and in the call
   bot's `turn.mjs`. `quietMs(text)` picks the hold or the pause; the auto-send
   timer and the barge-in timer both use it.
-- **Unfinished turns, for the agent.** The `stt` and `tts` descriptions
-  (`src/stts-mcp-server.ts`), the `/stts` command and the `stts` skill say: if
-  a transcript reads unfinished, do not answer; listen again and join the
-  pieces. When a returned transcript ends on a word from the list, the result
-  carries a second text: "This reads unfinished (it ends mid-thought). Unless
-  it is clearly complete, do not answer: listen again and join the pieces."
+- **Unfinished turns.** The daemon joins them (spec 044); the agent is never
+  asked to listen again for the rest.
 - **Open fast.** The `tts` description asks for a short first piece (3 to 6
   words) without listen, then the rest in one call with listen; at most two
   pieces per reply.
@@ -76,10 +69,10 @@ Three causes, all in the page:
 | Behavior | stts | callbot (its spec 005) | Why they differ |
 | --- | --- | --- | --- |
 | Silence before a turn is sent | 0.7 s, a setting in the window (a saved 3.5, 2, 1, 0.3 or 0.1 s moves to 0.7 once) | 0.1 s default (its minimum), `CALLBOT_PAUSE_MS` | Mark's preference (2026-09-30): stts 0.7 s, callbot kept at its minimum; stts keeps a per-window saved setting, the call bot has an env var |
-| When the turn reads unfinished | Waits 1 s, a setting in the window | No hold; the agent listens again with idleSec 1 (its spec 008) | Channel: Recall's speech events already mark end of speech, so the call bot leaves the unfinished judgment to the agent |
-| A transcript that repeats one already answered | Treated as late delivery: not answered again, the agent listens silently (tool descriptions, `/stts`) | The same, in `call_listen` and `call_say` | Same (Mark 2026-09-30) |
+| When the turn reads unfinished | Waits 1 s, a setting in the window | 3 s more quiet before the turn is released (its spec 014) | Same outcome: the server joins the rest |
+| A transcript that repeats one already answered | Never returned (spec 044) | Never returned (its spec 014) | Same |
 | What counts as unfinished | Last word in one fixed list | The same list | Same; neither recognizer punctuates reliably, so the last word is the signal |
-| The agent is told | Tool descriptions, and a note on the returned transcript | The same | Same |
+| The agent is told | Tool descriptions (turn protocol, spec 044) | The same (its spec 014) | Same |
 | Recognizer restart after an error | At once, backoff only on rapid repeats | Not applicable | The call bot has no recognizer of its own; Recall transcribes on its servers |
 | Words said over the voice | Kept for the next prompt; the voice finishes | Kept, delivered with `OVER_HER`; she finishes | Same outcome |
 | Own voice heard back | Browser echo canceller (spec 037) | Per-participant streams, skipped by speaker name (callbot spec 011) | Channel: browser mic vs meeting streams |

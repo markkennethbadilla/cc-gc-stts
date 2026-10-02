@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import * as ChromeLauncher from 'chrome-launcher';
 import { WebSocketServer, WebSocket } from 'ws';
-import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED, BACKGROUND_RESULT } from './protocol.ts';
+import { CONVERSATION_ENDED, NO_SPEECH, LISTEN_CONTINUES, STOPPED, BACKGROUND_RESULT, readsUnfinished } from './protocol.ts';
 import { handleVoice } from './piper.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +27,7 @@ type RequestConfig = {
   close?: boolean;       // spec 004: close the window once this request is answered
   idleSec?: number;      // spec 010: stt only, answer NO_SPEECH after this long with nothing heard
   timeoutMs?: number;    // spec 012: what is left of the caller's tool-call budget, capped at REQUEST_TIMEOUT_MS
+  ack?: number;          // spec 044: stt only, the turn id the agent answered without speaking
 };
 
 type Pending = {
@@ -49,6 +50,32 @@ type Pending = {
 const REQUEST_TIMEOUT_MS = Number(process.env.STTS_REQUEST_TIMEOUT_MS) || 240_000;
 
 let pending: Pending | null = null;
+
+// Spec 044. Strict turns. Every transcript returned gets the next turn id and its
+// capture times. A returned turn must be answered (any tts) or acked before the
+// next listen opens. An exact repeat of the last turn, or speech captured before
+// it ended, is never returned. A turn cut mid-thought is joined with what follows.
+const JOIN_SEC = Number(process.env.STTS_JOIN_SEC) || 3;   // wait this long for the rest of a cut turn
+const JOIN_MAX = 3;                                        // ponytail: at most 3 joins, then return what there is
+let turnId = 0;
+let unanswered = 0;   // id of the last returned turn the agent has not answered
+let lastNorm = '';    // normalised text of the last returned turn
+let lastEndAt = 0;    // capture end of the last returned turn
+let held: { text: string; startAt: number; endAt: number; joins: number } | null = null;
+const normText = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const hhmmss = (ms: number) => new Date(ms).toTimeString().slice(0, 8);
+
+function turnReply(h: { text: string; startAt: number; endAt: number }): string {
+  turnId++; unanswered = turnId; lastNorm = normText(h.text); lastEndAt = h.endAt;
+  return `[turn ${turnId}, heard ${hhmmss(h.startAt)} to ${hhmmss(h.endAt)}] ${h.text}`;
+}
+
+// What a listen that is ending now returns: the held turn if any, else the marker.
+function heldOr(marker: string): string {
+  if (!held) return marker;
+  const h = held; held = null;
+  return turnReply(h);
+}
 let pendingTimer: NodeJS.Timeout | null = null;
 let pageSocket: WebSocket | null = null;
 let chrome: ChromeLauncher.LaunchedChrome | null = null;
@@ -273,7 +300,7 @@ const server = http.createServer(async (req, res) => {
     const listening = pending?.config.mode === 'stt';
     if (listening) {
       if (pageSocket?.readyState === WebSocket.OPEN) pageSocket.send(JSON.stringify({ type: 'released' }));
-      resolvePending(BACKGROUND_RESULT);
+      resolvePending(heldOr(BACKGROUND_RESULT));
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ interrupted: listening }));
@@ -295,6 +322,26 @@ const server = http.createServer(async (req, res) => {
     // conversation, so a new call means the old caller is gone: its request is
     // answered as superseded and the new one proceeds. A superseded listen tells
     // the page to keep what it heard, as at the time limit, so no speech is lost.
+    let config: RequestConfig;
+    try {
+      config = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400);
+      res.end('bad json');
+      return;
+    }
+    // Spec 044. Answer, then listen. A listen while the last returned turn is
+    // unanswered is refused (it would be the "answered two turns later" bug);
+    // any tts answers it, an stt with ack=<that turn id> skips speaking.
+    if (config.mode === 'tts') unanswered = 0;
+    else if (unanswered && Number(config.ack) !== unanswered) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: `turn ${unanswered} is unanswered. Answer it now with tts (listen=true), ` +
+          `or, if it needs no spoken answer, call stt with ack=${unanswered}.`,
+      }));
+      return;
+    } else unanswered = 0;
     if (pending) {
       const old = pending;
       pending = null;
@@ -303,14 +350,6 @@ const server = http.createServer(async (req, res) => {
         pageSocket.send(JSON.stringify({ type: 'released' }));
       }
       old.cancel('superseded by a newer stts request');
-    }
-    let config: RequestConfig;
-    try {
-      config = JSON.parse(await readBody(req));
-    } catch {
-      res.writeHead(400);
-      res.end('bad json');
-      return;
     }
 
     let responded = false;
@@ -344,7 +383,7 @@ const server = http.createServer(async (req, res) => {
       pendingTimer = null;
       if (config.mode === 'stt') {
         if (pageSocket?.readyState === WebSocket.OPEN) pageSocket.send(JSON.stringify({ type: 'released' }));
-        entry.respond(LISTEN_CONTINUES);
+        entry.respond(heldOr(LISTEN_CONTINUES));
         return;
       }
       entry.cancel(
@@ -400,10 +439,37 @@ wss.on('connection', (socket) => {
         deliverToPage();
         return;
       case 'complete': {
-        let text = typeof msg.text === 'string' ? msg.text : '';
+        const text = typeof msg.text === 'string' ? msg.text.trim() : '';
         // Spec 042. Speech with no listen open is not kept for later.
         if (pending?.config.mode !== 'stt') return;
-        resolvePending(text);
+        const m = msg as { startAt?: number; endAt?: number };
+        const endAt = Number(m.endAt) || Date.now();
+        const startAt = Number(m.startAt) || endAt;
+        const relisten = (idleSec: number) => {
+          // The page went idle when it sent; open it again for the same listen.
+          pending!.config = { ...pending!.config, idleSec };
+          deliverToPage();
+        };
+        // Spec 044. Duplicate or stale: never returned, keep listening.
+        // The same words said again later (a second "yes") are a new turn: only a repeat whose
+        // capture overlaps the last turn (within 1 s of its end) is the same speech delivered twice.
+        const dup = normText(text) === lastNorm && startAt <= lastEndAt + 1000;
+        if (!held && (!text || dup || (lastEndAt && endAt <= lastEndAt))) {
+          console.error(`${new Date().toISOString()} turn dropped (duplicate or stale): ${text.slice(0, 80)}`);
+          relisten(pending.config.idleSec ?? 0);
+          return;
+        }
+        const h = held
+          ? { text: `${held.text} ${text}`.trim(), startAt: held.startAt, endAt, joins: held.joins + 1 }
+          : { text, startAt, endAt, joins: 0 };
+        // Spec 044. Cut mid-thought: hold it and listen JOIN_SEC more for the rest.
+        if (readsUnfinished(h.text) && h.joins < JOIN_MAX) {
+          held = h;
+          relisten(JOIN_SEC);
+          return;
+        }
+        held = null;
+        resolvePending(turnReply(h));
         return;
       }
       case 'cancel':
@@ -412,7 +478,7 @@ wss.on('connection', (socket) => {
         return;
       case 'nospeech':
         // Spec 010. Nothing heard within idleSec. Only an stt request can end this way.
-        if (pending?.config.mode === 'stt') resolvePending(NO_SPEECH);
+        if (pending?.config.mode === 'stt') resolvePending(heldOr(NO_SPEECH));
         return;
       case 'stopped':
         // Spec 013. He stopped the speaking turn; a reading must not go on to its next part.
