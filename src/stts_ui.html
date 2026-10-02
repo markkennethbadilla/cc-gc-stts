@@ -2108,7 +2108,7 @@
         saveIdleInterim();   // spec 012: an idle utterance the browser has not finalised yet is kept, not wiped
         prov = null; pendingInterim = '';
         origActivateStt(config);
-        if (carry) { insert(carry); carry = ''; armPause(); }
+        if (carry) { insert(carry); carry = ''; if (micSpeaking()) armPause(); else flushAndSend(); }   // spec 042: finished speech goes back at once
         armIdle(config.idleSec);
         heardAt = Date.now();   // spec 011: the quiet clock starts with the listen
       };

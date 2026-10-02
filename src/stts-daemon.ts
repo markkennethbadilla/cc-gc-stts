@@ -304,6 +304,13 @@ const server = http.createServer(async (req, res) => {
       res.end('bad json');
       return;
     }
+    // Spec 042. Speech he finished while the agent worked is already here: a
+    // listen returns it at once instead of waiting for him to speak again.
+    if (config.mode === 'stt' && barge.length) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ text: barge.splice(0).join(' ') }));
+      return;
+    }
 
     let responded = false;
     const entry: Pending = {

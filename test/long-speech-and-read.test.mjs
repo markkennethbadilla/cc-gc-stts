@@ -71,7 +71,7 @@ test('speech that lands with nothing pending is kept and comes back in order', a
   await wait(50);
   page.onRequest = (m) => { if (m.type === 'request') send({ type: 'complete', text: 'the new answer' }); };
   const r = await post({ mode: 'stt', timeoutMs: 2000 });
-  assert.equal(r.body.text, 'first part of a long thought and the rest of it the new answer');
+  assert.equal(r.body.text, 'first part of a long thought and the rest of it', 'spec 042: returned at once, before new speech');
 });
 
 test('a silent listen with buffered speech answers the speech, not the no-speech marker', async () => {
